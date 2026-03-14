@@ -1,5 +1,12 @@
 FROM gradle:8.10-jdk21-alpine AS build
 WORKDIR /app
+
+ARG GITHUB_ACTOR
+ARG GITHUB_TOKEN
+
+ENV GITHUB_ACTOR=${GITHUB_ACTOR}
+ENV GITHUB_TOKEN=${GITHUB_TOKEN}
+
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
 COPY gradlew ./

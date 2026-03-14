@@ -39,3 +39,4 @@ out/
 .env
 .codesight
 semgrep.sarif
+gradle.properties

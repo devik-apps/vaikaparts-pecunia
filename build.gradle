@@ -19,6 +19,14 @@ configurations {
 
 repositories {
     mavenLocal()
+    maven {
+        name = "GitHubPackages"
+        url = uri("https://maven.pkg.github.com/devik-apps/vaikaparts-pecunia")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR") ?: project.findProperty("gpr.user") ?: ""
+            password = System.getenv("GITHUB_TOKEN") ?: project.findProperty("gpr.key") ?: ""
+        }
+    }
     mavenCentral()
 }
 
@@ -74,6 +82,7 @@ dependencies {
     testImplementation 'com.icegreen:greenmail:2.1.8'
     testImplementation 'com.icegreen:greenmail-junit5:2.1.8'
 
+    implementation 'com.devik-apps:mvola-client:1.0.0'
 }
 
 tasks.named('test') {

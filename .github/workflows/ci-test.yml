@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      packages: read
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +45,9 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Run unit tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: make test-unit
 
       - name: Upload test results
@@ -61,6 +65,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      packages: read
 
     steps:
       - name: Checkout code
@@ -87,6 +92,9 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Run integration tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: make test-integration
 
       - name: Upload integration test results
@@ -130,6 +138,9 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Run all tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: make ci-test
 
       - name: Upload full test results

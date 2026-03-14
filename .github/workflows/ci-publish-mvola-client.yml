@@ -1,0 +1,191 @@
+name: CI - Publish MVola Client
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required: all tags must be present to check whether the version is already published
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: 3.9.6
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Resolve ZIP file and extract version
+        id: resolve_version
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -name "mvola-client-v*.zip" | head -n 1)
+
+          if [[ -z "${ZIP_FILE}" ]]; then
+            echo "ERROR: No file matching 'mvola-client-vX.Y.Z.zip' found at project root." >&2
+            exit 1
+          fi
+
+          FILENAME=$(basename "${ZIP_FILE}")
+          VERSION="${FILENAME#mvola-client-v}"
+          VERSION="${VERSION%.zip}"
+
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: Could not extract a valid semantic version from '${FILENAME}'." >&2
+            echo "Expected format: mvola-client-vX.Y.Z.zip" >&2
+            exit 1
+          fi
+
+          echo "zip_file=${ZIP_FILE}"   >> $GITHUB_OUTPUT
+          echo "version=${VERSION}"     >> $GITHUB_OUTPUT
+          echo "tag=mvola-client-v${VERSION}" >> $GITHUB_OUTPUT
+
+          echo "ZIP file : ${ZIP_FILE}"
+          echo "Version  : ${VERSION}"
+
+      - name: Check if version is already published
+        id: check_published
+        run: |
+          TAG="${{ steps.resolve_version.outputs.tag }}"
+
+          if git tag --list "${TAG}" | grep -qx "${TAG}"; then
+            echo "Version '${TAG}' is already published. Skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version '${TAG}' has not been published yet. Proceeding."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Grant execute permission for publish script
+        if: steps.check_published.outputs.skip == 'false'
+        run: chmod +x .shell/publish-mvola-client.sh
+
+      - name: Publish MVola client to GitHub Packages
+        if: steps.check_published.outputs.skip == 'false'
+        run: bash .shell/publish-mvola-client.sh
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Write dependency snippets
+        if: steps.check_published.outputs.skip == 'false'
+        run: |
+          VERSION="${{ steps.resolve_version.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          OWNER="${REPO%%/*}"
+          GROUP="com.${OWNER}"
+          ARTIFACT="mvola-client"
+
+          mkdir -p build
+          cat > build/mvola-client-dependency-snippets.txt <<EOF
+          ============================================================
+          MVola Client ${VERSION} - Dependency Integration Snippets
+          ============================================================
+
+          ------------------------------------------------------------
+          Maven (pom.xml)
+          ------------------------------------------------------------
+
+          <!-- Repository -->
+          <repositories>
+            <repository>
+              <id>github</id>
+              <name>GitHub Packages</name>
+              <url>https://maven.pkg.github.com/${REPO}</url>
+            </repository>
+          </repositories>
+
+          <!-- Dependency -->
+          <dependency>
+            <groupId>${GROUP}</groupId>
+            <artifactId>${ARTIFACT}</artifactId>
+            <version>${VERSION}</version>
+          </dependency>
+
+          ------------------------------------------------------------
+          Gradle Groovy DSL (build.gradle)
+          ------------------------------------------------------------
+
+          // Repository — in repositories {} block
+          maven {
+              name = "GitHubPackages"
+              url = uri("https://maven.pkg.github.com/${REPO}")
+              credentials {
+                  username = System.getenv("GITHUB_USERNAME")
+                  password = System.getenv("GITHUB_TOKEN")
+              }
+          }
+
+          // Dependency — in dependencies {} block
+          implementation '${GROUP}:${ARTIFACT}:${VERSION}'
+
+          ------------------------------------------------------------
+          Gradle Kotlin DSL (build.gradle.kts)
+          ------------------------------------------------------------
+
+          // Repository — in repositories {} block
+          maven {
+              name = "GitHubPackages"
+              url = uri("https://maven.pkg.github.com/${REPO}")
+              credentials {
+                  username = System.getenv("GITHUB_USERNAME")
+                  password = System.getenv("GITHUB_TOKEN")
+              }
+          }
+
+          // Dependency — in dependencies {} block
+          implementation("${GROUP}:${ARTIFACT}:${VERSION}")
+          EOF
+
+          echo "--- Dependency snippets ---"
+          cat build/mvola-client-dependency-snippets.txt
+
+      - name: Tag commit with published version
+        if: steps.check_published.outputs.skip == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.resolve_version.outputs.tag }}" "${{ github.sha }}"
+          git push origin "${{ steps.resolve_version.outputs.tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.resolve_version.outputs.version }}"
+          SKIP="${{ steps.check_published.outputs.skip }}"
+
+          if [[ "${SKIP}" == "true" ]]; then
+            echo "### Publication skipped" >> $GITHUB_STEP_SUMMARY
+            echo "Version \`${VERSION}\` was already published. No action was taken." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Publication successful" >> $GITHUB_STEP_SUMMARY
+            echo "MVola client version \`${VERSION}\` has been published to GitHub Packages." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Git tag: \`mvola-client-v${VERSION}\`" >> $GITHUB_STEP_SUMMARY
+          fi

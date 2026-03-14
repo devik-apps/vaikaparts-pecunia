@@ -1,19 +1,23 @@
 FROM gradle:8.10-jdk21-alpine AS build
 WORKDIR /app
 
-ARG GITHUB_ACTOR
-ARG GITHUB_TOKEN
-
-ENV GITHUB_ACTOR=${GITHUB_ACTOR}
-ENV GITHUB_TOKEN=${GITHUB_TOKEN}
-
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
 COPY gradlew ./
-RUN ./gradlew dependencies --no-daemon || true
+
+RUN --mount=type=secret,id=github_actor \
+    --mount=type=secret,id=github_token \
+    GITHUB_ACTOR=$(cat /run/secrets/github_actor) \
+    GITHUB_TOKEN=$(cat /run/secrets/github_token) \
+    ./gradlew dependencies --no-daemon || true
 COPY doc ./doc
 COPY src ./src
-RUN ./gradlew bootJar --no-daemon
+
+RUN --mount=type=secret,id=github_actor \
+    --mount=type=secret,id=github_token \
+    GITHUB_ACTOR=$(cat /run/secrets/github_actor) \
+    GITHUB_TOKEN=$(cat /run/secrets/github_token) \
+    ./gradlew bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app

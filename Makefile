@@ -191,9 +191,10 @@ semgrep: install-semgrep ## Run Semgrep security scanning
 ##@ Docker
 
 docker-build: ## Build Docker image
-	$(DOCKER) build \
-		--build-arg GITHUB_ACTOR=$(GITHUB_ACTOR) \
-		--build-arg GITHUB_TOKEN=$(GITHUB_TOKEN) \
+	$(DOCKER) buildx build \
+		--load \
+		--secret id=github_actor,env=GITHUB_ACTOR \
+		--secret id=github_token,env=GITHUB_TOKEN \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 docker-build-cache: ## Build Docker image with buildx cache

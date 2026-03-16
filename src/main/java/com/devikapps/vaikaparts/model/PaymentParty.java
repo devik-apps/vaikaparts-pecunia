@@ -1,5 +1,6 @@
 package com.devikapps.vaikaparts.model;
 
+import com.devikapps.vaikaparts.model.classifier.Country;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,5 +19,5 @@ public class PaymentParty {
   private UUID id;
   private String phoneNumber;
   private String name;
-  private String country;
+  private Country country;
 }

@@ -1,0 +1,11 @@
+CREATE TYPE payment_provider AS ENUM ('MVOLA');
+
+CREATE TYPE payment_type AS ENUM ('PROFILE_UNLOCK');
+
+CREATE TYPE payment_currency AS ENUM ('AR');
+
+CREATE TYPE payment_status AS ENUM ('PENDING', 'COMPLETED', 'FAILED');
+
+CREATE TYPE country AS ENUM ('MADAGASCAR');
+
+CREATE TYPE event_status AS ENUM ('PENDING', 'COMPLETED', 'FAILED');

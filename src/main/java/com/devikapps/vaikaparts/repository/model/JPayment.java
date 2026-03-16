@@ -1,8 +1,8 @@
 package com.devikapps.vaikaparts.repository.model;
 
+import com.devikapps.vaikaparts.event.model.VerificationStatus;
 import com.devikapps.vaikaparts.model.classifier.PaymentCurrency;
 import com.devikapps.vaikaparts.model.classifier.PaymentProvider;
-import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -38,6 +38,9 @@ import org.hibernate.type.SqlTypes;
 public class JPayment {
   @Id private String id;
 
+  @Column(name = "transaction_id")
+  private String transactionId;
+
   private String description;
 
   @ManyToOne(fetch = FetchType.LAZY)
@@ -64,7 +67,7 @@ public class JPayment {
 
   @Enumerated(EnumType.STRING)
   @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-  private PaymentStatus status;
+  private VerificationStatus status;
 
   @Column(name = "created_at")
   private LocalDateTime createdAt;

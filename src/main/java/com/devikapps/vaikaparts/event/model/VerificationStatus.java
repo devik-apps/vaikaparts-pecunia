@@ -1,6 +1,6 @@
 package com.devikapps.vaikaparts.event.model;
 
-public enum EventStatus {
+public enum VerificationStatus {
   PENDING,
   SUCCESS,
   FAILED

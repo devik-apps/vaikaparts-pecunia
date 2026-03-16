@@ -3,19 +3,19 @@ package com.devikapps.vaikaparts.repository.model;
 import com.devikapps.vaikaparts.model.classifier.Country;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Pattern;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "payment_parties")
@@ -35,9 +35,8 @@ public class JPaymentParty {
   private String phoneNumber;
 
   private String name;
-  private Country country;
 
-  @OneToMany(mappedBy = "payment_party", fetch = FetchType.LAZY)
-  @Builder.Default
-  private List<JPayment> payments = new ArrayList<>();
+  @Enumerated(EnumType.STRING)
+  @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+  private Country country;
 }

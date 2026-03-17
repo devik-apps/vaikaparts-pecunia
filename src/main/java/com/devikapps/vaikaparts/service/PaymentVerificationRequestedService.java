@@ -1,6 +1,7 @@
 package com.devikapps.vaikaparts.service;
 
 import static java.lang.String.format;
+import static java.time.LocalDateTime.now;
 import static org.owasp.encoder.Encode.forJava;
 
 import com.devikapps.vaikaparts.event.model.PaymentVerificationRequested;
@@ -9,11 +10,13 @@ import com.devikapps.vaikaparts.exception.PaymentVerificationRequestedException;
 import com.devikapps.vaikaparts.gateway.PaymentGateway;
 import com.devikapps.vaikaparts.gateway.PaymentGatewayFactory;
 import com.devikapps.vaikaparts.model.PaymentResponse;
+import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.repository.PaymentRepository;
 import com.devikapps.vaikaparts.repository.PaymentRequestedRepository;
 import com.devikapps.vaikaparts.repository.model.JPayment;
 import com.devikapps.vaikaparts.repository.model.JPaymentVerificationRequested;
-import java.time.LocalDateTime;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.constraints.NotNull;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,15 +36,16 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
 
   @Override
   @Transactional
-  public void accept(final PaymentVerificationRequested event) {
+  public void accept(PaymentVerificationRequested event) {
     log.info(
-        "Processing PaymentVerificationRequested event: {}, paymentId: {}, attempt: {}",
-        forJava(event.getId()),
+        "Processing PaymentVerificationRequested event={}, paymentId={}, attempt={}",
+        event.getId(),
         forJava(event.getPaymentId()),
         event.getAttemptNb());
 
-    final JPayment payment = fetchPayment(event.getPaymentId());
-    final JPaymentVerificationRequested eventLog = fetchEventLog(event.getId());
+    JPayment payment = fetchPayment(event.getPaymentId());
+    JPaymentVerificationRequested paymentVerificationRequested =
+        fetchPaymentVerificationRequested(event.getId().toString());
 
     try {
       final PaymentGateway gateway = gatewayFactory.getGateway(payment.getProvider());
@@ -49,171 +53,172 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
       final VerificationStatus providerStatus = resolveVerificationStatus(response.getStatus());
 
       switch (providerStatus) {
-        case SUCCESS -> handleSuccess(payment, eventLog, event);
-        case PENDING -> handlePending(payment, eventLog, event);
-        case FAILED -> handleFailed(payment, eventLog, event);
+        case SUCCESS -> handleSuccess(payment, paymentVerificationRequested, event);
+        case PENDING -> handlePending(payment, paymentVerificationRequested, event);
+        case FAILED -> handleFailed(payment, paymentVerificationRequested, event);
       }
 
-    } catch (Exception e) {
-      handleProcessingError(eventLog, event, e);
+    } catch (PaymentVerificationRequestedException e) {
+      handleProcessingError(paymentVerificationRequested, event, e);
     }
   }
 
   private void handleSuccess(
-      final JPayment payment,
-      final JPaymentVerificationRequested eventLog,
+      JPayment payment,
+      JPaymentVerificationRequested paymentVerificationRequested,
       final PaymentVerificationRequested event) {
     log.info(
-        "Payment verified as SUCCESS for paymentId: {}, event: {}",
-        forJava(event.getPaymentId()),
-        forJava(event.getId()));
+        "Payment verified as SUCCESS for paymentId={}, transactionId={}, event={}",
+        event.getPaymentId(),
+        payment.getTransactionId(),
+        event.getId());
 
     payment.setStatus(VerificationStatus.SUCCESS);
-    payment.setUpdatedAt(LocalDateTime.now());
+    payment.setUpdatedAt(now());
     paymentRepository.save(payment);
 
-    eventLog.setStatus(VerificationStatus.SUCCESS);
-    eventLog.setAttemptNb(event.getAttemptNb());
-    eventLog.setErrorMessage(null);
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    eventLog.setCompletedAt(LocalDateTime.now());
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    paymentRequestedRepository.save(eventLog);
+    paymentVerificationRequested.setStatus(VerificationStatus.SUCCESS);
+    paymentVerificationRequested.setAttemptNb(event.getAttemptNb());
+    paymentVerificationRequested.setErrorMessage(null);
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setCompletedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentRequestedRepository.save(paymentVerificationRequested);
   }
 
   private void handlePending(
-      final JPayment payment,
-      final JPaymentVerificationRequested eventLog,
-      final PaymentVerificationRequested event) {
+      JPayment payment,
+      JPaymentVerificationRequested paymentVerificationRequested,
+      PaymentVerificationRequested event) {
 
-    final int currentAttempt = event.getAttemptNb();
-    final int maxAttempts = eventLog.getMaxVerificationAttemptNb();
+    final var currentAttempt = event.getAttemptNb();
+    final var maxAttempts = event.getMaxVerificationAttemptNb();
 
     if (currentAttempt >= maxAttempts) {
       log.warn(
-          "Max verification attempts ({}) reached for paymentId: {}, event: {}. Marking as FAILED.",
+          "Max verification attempts ({}) reached for paymentId={}, event={}. Marking as FAILED.",
           maxAttempts,
           forJava(event.getPaymentId()),
-          forJava(event.getId()));
+          event.getId());
       markAsFailed(
           payment,
-          eventLog,
+          paymentVerificationRequested,
           event,
           format("Max verification attempts (%d) reached with status still PENDING.", maxAttempts));
       return;
     }
 
     log.info(
-        "Payment still PENDING for paymentId: {}, attempt {}/{}. Will retry.",
+        "Payment still PENDING for paymentId={}, attempt {}/{}. Will retry.",
         forJava(event.getPaymentId()),
         currentAttempt,
         maxAttempts);
 
-    eventLog.setStatus(VerificationStatus.PENDING);
-    eventLog.setAttemptNb(currentAttempt);
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    paymentRequestedRepository.save(eventLog);
+    paymentVerificationRequested.setStatus(VerificationStatus.PENDING);
+    paymentVerificationRequested.setAttemptNb(currentAttempt);
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentRequestedRepository.save(paymentVerificationRequested);
   }
 
   private void handleFailed(
       final JPayment payment,
-      final JPaymentVerificationRequested eventLog,
+      JPaymentVerificationRequested paymentVerificationRequested,
       final PaymentVerificationRequested event) {
 
-    final int failedAttempts = eventLog.getFailedAttemptNb() + 1;
-    eventLog.setFailedAttemptNb(failedAttempts);
+    final var failedAttempts = paymentVerificationRequested.getFailedAttemptNb() + 1;
+    paymentVerificationRequested.setFailedAttemptNb(failedAttempts);
 
     if (failedAttempts > MAX_FAILED_RETRIES) {
       log.warn(
-          "Provider returned FAILED {} time(s) for paymentId: {}, event: {}. Marking as FAILED.",
+          "Provider returned FAILED {} time(s) for paymentId={}, event={}. Marking as FAILED.",
           failedAttempts,
           forJava(event.getPaymentId()),
-          forJava(event.getId()));
+          event.getId());
       markAsFailed(
           payment,
-          eventLog,
+          paymentVerificationRequested,
           event,
           format("Provider returned FAILED status after %d retries.", failedAttempts));
       return;
     }
 
     log.info(
-        "Provider returned FAILED for paymentId: {}, failed attempt {}/{}. Will retry.",
+        "Provider returned FAILED for paymentId={}, failed attempt {}/{}. Will retry.",
         forJava(event.getPaymentId()),
         failedAttempts,
         MAX_FAILED_RETRIES);
 
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    paymentRequestedRepository.save(eventLog);
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentRequestedRepository.save(paymentVerificationRequested);
   }
 
   private void markAsFailed(
-      final JPayment payment,
-      final JPaymentVerificationRequested eventLog,
+      JPayment payment,
+      JPaymentVerificationRequested paymentVerificationRequested,
       final PaymentVerificationRequested event,
       final String reason) {
     payment.setStatus(VerificationStatus.FAILED);
-    payment.setUpdatedAt(LocalDateTime.now());
+    payment.setUpdatedAt(now());
     paymentRepository.save(payment);
 
-    eventLog.setStatus(VerificationStatus.FAILED);
-    eventLog.setAttemptNb(event.getAttemptNb());
-    eventLog.setErrorMessage(reason);
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    eventLog.setCompletedAt(LocalDateTime.now());
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    paymentRequestedRepository.save(eventLog);
+    paymentVerificationRequested.setStatus(VerificationStatus.FAILED);
+    paymentVerificationRequested.setAttemptNb(event.getAttemptNb());
+    paymentVerificationRequested.setErrorMessage(reason);
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setCompletedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentRequestedRepository.save(paymentVerificationRequested);
   }
 
-  private JPayment fetchPayment(final String paymentId) {
+  private JPayment fetchPayment(@NotNull final String paymentId) {
     return paymentRepository
         .findById(paymentId)
         .orElseThrow(
             () -> {
-              log.error("Payment not found: {}", forJava(paymentId));
-              return new IllegalStateException(format("Payment not found: %s", paymentId));
+              log.error("Payment not found={}", forJava(paymentId));
+              return new EntityNotFoundException(format("Payment not found: %s", paymentId));
             });
   }
 
-  private JPaymentVerificationRequested fetchEventLog(final String eventId) {
+  private JPaymentVerificationRequested fetchPaymentVerificationRequested(
+      @NotNull final String eventId) {
     return paymentRequestedRepository
         .findById(eventId)
         .orElseThrow(
             () -> {
-              log.error("PaymentVerificationRequested event log not found: {}", forJava(eventId));
-              return new IllegalStateException(
-                  format("PaymentVerificationRequested event log not found: %s", eventId));
+              log.error("PaymentVerificationRequested event log not found={}", forJava(eventId));
+              return new EntityNotFoundException(
+                  format("PaymentVerificationRequested event log not found: %s", forJava(eventId)));
             });
   }
 
-  private VerificationStatus resolveVerificationStatus(final Object providerStatus) {
-    if (providerStatus == null) {
-      return VerificationStatus.PENDING;
-    }
-    return switch (providerStatus.toString().toUpperCase()) {
-      case "COMPLETED", "SUCCESS" -> VerificationStatus.SUCCESS;
-      case "FAILED" -> VerificationStatus.FAILED;
+  private VerificationStatus resolveVerificationStatus(final PaymentStatus providerStatus) {
+    if (providerStatus == null) return VerificationStatus.PENDING;
+
+    return switch (providerStatus) {
+      case COMPLETED -> VerificationStatus.SUCCESS;
+      case FAILED -> VerificationStatus.FAILED;
       default -> VerificationStatus.PENDING;
     };
   }
 
   private void handleProcessingError(
-      final JPaymentVerificationRequested eventLog,
+      final JPaymentVerificationRequested paymentVerificationRequested,
       final PaymentVerificationRequested event,
       final Exception e) {
     log.error(
-        "Failed to process PaymentVerificationRequested event: {}, attempt: {}",
-        forJava(event.getId()),
+        "Failed to process PaymentVerificationRequested event={}, attempt={}",
+        event.getId(),
         event.getAttemptNb(),
         e);
 
-    eventLog.setErrorMessage(e.getMessage());
-    eventLog.setLastVerifiedAt(LocalDateTime.now());
-    paymentRequestedRepository.save(eventLog);
+    paymentVerificationRequested.setErrorMessage(e.getMessage());
+    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentRequestedRepository.save(paymentVerificationRequested);
 
     throw new PaymentVerificationRequestedException(
-        format("PaymentVerificationRequested processing failed for event: %s", event.getId()), e);
+        format("PaymentVerificationRequested processing failed for event=%s", event.getId()), e);
   }
 }

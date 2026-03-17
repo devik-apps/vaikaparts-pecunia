@@ -36,7 +36,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
 
+@Transactional
 class PaymentVerificationRequestedServiceIT extends FacadeIT {
 
   private static final long CONSUMER_PROCESSING_WAIT_MS = 5000L;

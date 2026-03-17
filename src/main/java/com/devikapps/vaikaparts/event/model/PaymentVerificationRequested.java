@@ -5,7 +5,6 @@ import static java.time.Duration.ofSeconds;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Duration;
-import java.util.UUID;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,7 +18,7 @@ public class PaymentVerificationRequested extends InfraEvent {
   private static final Duration MAX_CONSUMER_DURATION = ofMinutes(5L);
   private static final Duration MAX_CONSUMER_BACKOFF = ofSeconds(30L);
 
-  private final UUID id;
+  private final String id;
   private final String paymentId;
   private final int maxVerificationAttemptNb;
 

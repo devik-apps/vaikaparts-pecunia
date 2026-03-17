@@ -4,6 +4,7 @@ CREATE TABLE payment_verification_requested
     payment_id                 VARCHAR(45)         NOT NULL REFERENCES payments (id),
     status                     verification_status NOT NULL DEFAULT 'PENDING',
     attempt_nb                 INT                 NOT NULL,
+    failed_attempt_nb          INT                 NOT NULL,
     max_verification_attemp_nb INT                 NOT NULL DEFAULT 3,
     error_message              TEXT,
     created_at                 TIMESTAMP WITH TIME ZONE     DEFAULT current_timestamp,

@@ -6,4 +6,4 @@ CREATE TYPE payment_currency AS ENUM ('AR');
 
 CREATE TYPE country AS ENUM ('MADAGASCAR');
 
-CREATE TYPE verification_status AS ENUM ('PENDING', 'COMPLETED', 'FAILED');
+CREATE TYPE verification_status AS ENUM ('PENDING', 'SUCCESS', 'FAILED');

@@ -1,8 +1,7 @@
-package com.devikapps.vaikaparts.event.config;
+package com.devikapps.vaikaparts.event.model;
 
 import com.devikapps.vaikaparts.InfraGenerated;
 import com.devikapps.vaikaparts.datastructure.ListGrouper;
-import com.devikapps.vaikaparts.event.model.InfraEvent;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

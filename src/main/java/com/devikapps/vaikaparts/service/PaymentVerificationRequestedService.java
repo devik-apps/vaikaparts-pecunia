@@ -35,7 +35,7 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
   private final PaymentGatewayFactory gatewayFactory;
 
   @Override
-  @Transactional
+  @Transactional(noRollbackFor = PaymentVerificationRequestedException.class)
   public void accept(PaymentVerificationRequested event) {
     log.info(
         "Processing PaymentVerificationRequested event={}, paymentId={}, attempt={}",
@@ -45,7 +45,7 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
 
     JPayment payment = fetchPayment(event.getPaymentId());
     JPaymentVerificationRequested paymentVerificationRequested =
-        fetchPaymentVerificationRequested(event.getId().toString());
+        fetchPaymentVerificationRequested(event.getId());
 
     try {
       final PaymentGateway gateway = gatewayFactory.getGateway(payment.getProvider());
@@ -58,7 +58,7 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
         case FAILED -> handleFailed(payment, paymentVerificationRequested, event);
       }
 
-    } catch (PaymentVerificationRequestedException e) {
+    } catch (Exception e) {
       handleProcessingError(paymentVerificationRequested, event, e);
     }
   }

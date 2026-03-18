@@ -1,8 +1,8 @@
 package com.devikapps.vaikaparts.gateway.mvola;
 
-import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
 import static java.lang.String.format;
 import static java.time.LocalDateTime.now;
+import static java.time.format.DateTimeFormatter.ofPattern;
 import static java.util.UUID.randomUUID;
 import static org.owasp.encoder.Encode.forJava;
 
@@ -11,10 +11,10 @@ import com.devikapps.vaikaparts.gateway.AbstractPaymentGateway;
 import com.devikapps.vaikaparts.model.PaymentRequest;
 import com.devikapps.vaikaparts.model.PaymentResponse;
 import com.devikapps.vaikaparts.model.classifier.PaymentProvider;
-import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.service.MvolaTokenService;
+import com.devikapps.vaikaparts.service.util.MvolaResponseParser;
 import com.devikapps.vaikaparts.validator.PaymentRequestValidator;
-import java.time.format.DateTimeFormatter;
+import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.wso2.client.api.ApiClient;
@@ -32,55 +32,56 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
 
   private final MvolaProperties properties;
   private final MvolaTokenService tokenService;
+  private final MvolaResponseParser responseParser;
   private final DefaultApi defaultApi;
 
   public MvolaPaymentGateway(
-      PaymentRequestValidator validator,
-      MvolaProperties properties,
-      MvolaTokenService tokenService) {
+      final PaymentRequestValidator validator,
+      final MvolaProperties properties,
+      final MvolaTokenService tokenService,
+      final MvolaResponseParser responseParser) {
     super(validator);
     this.properties = properties;
     this.tokenService = tokenService;
+    this.responseParser = responseParser;
     this.defaultApi = buildDefaultApi();
   }
 
   @Override
   public PaymentProvider getProvider() {
-    return MVOLA;
+    return PaymentProvider.MVOLA;
   }
 
   @Override
-  protected PaymentResponse doInitiatePayment(PaymentRequest request) {
-    var mvolaRequest = (MvolaPaymentRequest) request;
-
+  protected PaymentResponse doInitiatePayment(final PaymentRequest request) {
+    final MvolaPaymentRequest mvolaRequest = (MvolaPaymentRequest) request;
     configureApiClientToken();
 
-    PostRequest postRequest = buildPostRequest(mvolaRequest);
-    String correlationId = resolveCorrelationId(mvolaRequest);
-    String callbackUrl = resolveCallbackUrl(mvolaRequest);
-
     try {
-      defaultApi.rootPost(
-          API_VERSION,
-          correlationId,
-          CACHE_CONTROL,
-          postRequest,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          callbackUrl);
+      final okhttp3.Call call =
+          defaultApi.rootPostCall(
+              API_VERSION,
+              resolveCorrelationId(mvolaRequest),
+              CACHE_CONTROL,
+              buildPostRequest(mvolaRequest),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              resolveCallbackUrl(mvolaRequest),
+              null);
 
-      return MvolaPaymentResponse.builder()
-          .transactionId(request.getTransactionId())
-          .status(PaymentStatus.PENDING)
-          .amount(request.getAmount())
-          .currency(request.getCurrency())
-          .provider(MVOLA)
-          .respondedAt(now())
-          .build();
+      final String rawBody = executeAndReadBody(call);
+      final MvolaPaymentResponse response = responseParser.initiatePaymentParser.apply(rawBody);
+
+      response.setTransactionId(request.getTransactionId());
+      response.setAmount(request.getAmount());
+      response.setCurrency(request.getCurrency());
+      response.setProvider(PaymentProvider.MVOLA);
+
+      return response;
 
     } catch (ApiException e) {
       log.error(
@@ -90,33 +91,37 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
           e);
       throw new PaymentGatewayException(
           format(
-              "MVola initiatePayment failed: %s, errorCode=%s", e.getResponseBody(), e.getCode()));
+              "MVola initiatePayment failed: %s. ErrorCode=%d", e.getResponseBody(), e.getCode()));
+    } catch (IOException e) {
+      log.error("MVola initiatePayment I/O error.", e);
+      throw new PaymentGatewayException("MVola initiatePayment I/O error.");
     }
   }
 
   @Override
-  protected PaymentResponse doGetPaymentStatus(String serverCorrelationId) {
+  protected PaymentResponse doGetPaymentStatus(final String serverCorrelationId) {
     configureApiClientToken();
 
     try {
-      defaultApi.statusServerCorrelationIdGet(
-          serverCorrelationId,
-          API_VERSION,
-          randomUUID().toString(),
-          format("msisdn;%s", properties.getPartnerMsisdn()),
-          properties.getPartnerName(),
-          CACHE_CONTROL,
-          null,
-          null,
-          null,
-          null);
+      final okhttp3.Call call =
+          defaultApi.statusServerCorrelationIdGetCall(
+              serverCorrelationId,
+              API_VERSION,
+              randomUUID().toString(),
+              String.format("msisdn;%s", properties.getPartnerMsisdn()),
+              properties.getPartnerName(),
+              CACHE_CONTROL,
+              null,
+              null,
+              null,
+              null,
+              null);
 
-      return MvolaPaymentResponse.builder()
-          .serverCorrelationId(serverCorrelationId)
-          .status(PaymentStatus.PENDING)
-          .provider(MVOLA)
-          .respondedAt(now())
-          .build();
+      final String rawBody = executeAndReadBody(call);
+      final MvolaPaymentResponse response = responseParser.paymentStatusParser.apply(rawBody);
+
+      response.setProvider(PaymentProvider.MVOLA);
+      return response;
 
     } catch (ApiException e) {
       log.error(
@@ -125,8 +130,10 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
           forJava(e.getResponseBody()),
           e);
       throw new PaymentGatewayException(
-          format(
-              "MVola getPaymentStatus failed: %s, errorCode=%s", e.getResponseBody(), e.getCode()));
+          format("MVola getPaymentStatus failed: %s", e.getResponseBody()));
+    } catch (IOException e) {
+      log.error("MVola getPaymentStatus I/O error.", e);
+      throw new PaymentGatewayException("MVola getPaymentStatus I/O error.");
     }
   }
 
@@ -135,23 +142,24 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
     configureApiClientToken();
 
     try {
-      defaultApi.transactionReferenceGet(
-          transactionReference,
-          API_VERSION,
-          randomUUID().toString(),
-          format("msisdn;%s", properties.getPartnerMsisdn()),
-          CACHE_CONTROL,
-          null,
-          null,
-          null,
-          null);
+      final okhttp3.Call call =
+          defaultApi.transactionReferenceGetCall(
+              transactionReference,
+              API_VERSION,
+              randomUUID().toString(),
+              String.format("msisdn;%s", properties.getPartnerMsisdn()),
+              CACHE_CONTROL,
+              null,
+              null,
+              null,
+              null,
+              null);
 
-      return MvolaPaymentResponse.builder()
-          .transactionId(transactionReference)
-          .status(PaymentStatus.PENDING)
-          .provider(MVOLA)
-          .respondedAt(now())
-          .build();
+      final String rawBody = executeAndReadBody(call);
+      final MvolaPaymentResponse response = responseParser.paymentDetailsParser.apply(rawBody);
+
+      response.setProvider(PaymentProvider.MVOLA);
+      return response;
 
     } catch (ApiException e) {
       log.error(
@@ -161,8 +169,23 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
           e);
       throw new PaymentGatewayException(
           format(
-              "MVola getPaymentDetails failed: %s, errorCode=%s",
-              e.getResponseBody(), e.getCode()));
+              "MVola getPaymentDetails failed: %s. ErrCode=%s", e.getResponseBody(), e.getCode()));
+    } catch (IOException e) {
+      log.error("MVola getPaymentDetails I/O error.", e);
+      throw new PaymentGatewayException("MVola getPaymentDetails I/O error.");
+    }
+  }
+
+  private String executeAndReadBody(final okhttp3.Call call) throws IOException, ApiException {
+    try (final okhttp3.Response response = call.execute()) {
+
+      final String rawBody = response.body().string();
+
+      if (!response.isSuccessful())
+        throw new ApiException(
+            response.message(), response.code(), response.headers().toMultimap(), rawBody);
+
+      return rawBody;
     }
   }
 
@@ -175,7 +198,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
         .amount(request.getAmount().toBigInteger().toString())
         .currency("Ar")
         .descriptionText(request.getDescription())
-        .requestDate(now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ")))
+        .requestDate(now().format(ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ")))
         .requestingOrganisationTransactionReference(request.getTransactionId())
         .originalTransactionReference("")
         .addDebitPartyItem(buildParty("msisdn", request.getPayer().getPhoneNumber()))
@@ -203,6 +226,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
 
   private DefaultApi buildDefaultApi() {
     var client = new ApiClient();
+
     client.setBasePath(properties.getBaseUrl());
     client.setVerifyingSsl(true);
     client.addDefaultHeader("UserLanguage", "FR");
@@ -210,9 +234,8 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
         "UserAccountIdentifier", format("msisdn;%s", properties.getPartnerMsisdn()));
     client.addDefaultHeader("partnerName", properties.getPartnerName());
 
-    DefaultApi api = new DefaultApi(client);
+    var api = new DefaultApi(client);
     api.setCustomBaseUrl(properties.getBaseUrl());
-
     return api;
   }
 }

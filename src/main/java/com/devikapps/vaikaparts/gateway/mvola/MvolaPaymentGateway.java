@@ -1,7 +1,6 @@
 package com.devikapps.vaikaparts.gateway.mvola;
 
 import static java.lang.String.format;
-import static java.time.LocalDateTime.now;
 import static java.time.format.DateTimeFormatter.ofPattern;
 import static java.util.UUID.randomUUID;
 import static org.owasp.encoder.Encode.forJava;
@@ -15,6 +14,7 @@ import com.devikapps.vaikaparts.service.MvolaTokenService;
 import com.devikapps.vaikaparts.service.util.MvolaResponseParser;
 import com.devikapps.vaikaparts.validator.PaymentRequestValidator;
 import java.io.IOException;
+import java.time.OffsetDateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.wso2.client.api.ApiClient;
@@ -147,7 +147,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
               transactionReference,
               API_VERSION,
               randomUUID().toString(),
-              String.format("msisdn;%s", properties.getPartnerMsisdn()),
+              format("msisdn;%s", properties.getPartnerMsisdn()),
               CACHE_CONTROL,
               null,
               null,
@@ -198,7 +198,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
         .amount(request.getAmount().toBigInteger().toString())
         .currency("Ar")
         .descriptionText(request.getDescription())
-        .requestDate(now().format(ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ")))
+        .requestDate(OffsetDateTime.now().format(ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ")))
         .requestingOrganisationTransactionReference(request.getTransactionId())
         .originalTransactionReference("")
         .addDebitPartyItem(buildParty("msisdn", request.getPayer().getPhoneNumber()))

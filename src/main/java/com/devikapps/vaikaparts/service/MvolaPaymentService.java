@@ -20,6 +20,7 @@ public class MvolaPaymentService implements PaymentService {
   @Override
   public PaymentResponse initiatePayment(PaymentRequest request) {
     log.info("MVola initiatePayment for transactionId={}", forJava(request.getTransactionId()));
+    // TODO : to be implemented later
     return gatewayFactory.getGateway(MVOLA).initiatePayment(request);
   }
 

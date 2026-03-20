@@ -1,7 +1,7 @@
 CREATE TABLE payments
 (
     id             VARCHAR(45) PRIMARY KEY,
-    transaction_id VARCHAR(50)              NOT NULL,
+    transaction_id VARCHAR(50),
     description    TEXT                     NOT NULL,
     payer_id       VARCHAR(45) REFERENCES payment_parties (id),
     payee_id       VARCHAR(45) REFERENCES payment_parties (id),

@@ -6,6 +6,7 @@ import static java.time.format.DateTimeFormatter.ofPattern;
 import static java.util.UUID.randomUUID;
 import static org.owasp.encoder.Encode.forJava;
 
+import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
 import com.devikapps.vaikaparts.gateway.AbstractPaymentGateway;
 import com.devikapps.vaikaparts.model.PaymentRequest;
@@ -33,14 +34,14 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
   private static final String API_VERSION = "1.0";
   private static final String CACHE_CONTROL = "no-cache";
 
-  private final MvolaProperties properties;
+  private final MvolaConf properties;
   private final MvolaTokenService tokenService;
   private final MvolaResponseParser responseParser;
   private DefaultApi defaultApi;
 
   public MvolaPaymentGateway(
       final PaymentRequestValidator validator,
-      final MvolaProperties properties,
+      final MvolaConf properties,
       final MvolaTokenService tokenService,
       final MvolaResponseParser responseParser) {
     super(validator);

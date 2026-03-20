@@ -1,4 +1,4 @@
-package com.devikapps.vaikaparts.gateway.mvola;
+package com.devikapps.vaikaparts.config;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -11,7 +11,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @Getter
 @Setter
-public class MvolaProperties {
+public class MvolaConf {
 
   @Value("${payment.mvola.consumer.key}")
   @NotBlank

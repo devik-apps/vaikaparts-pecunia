@@ -15,6 +15,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.devikapps.vaikaparts.client.MvolaApiTestBase;
+import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
 import com.devikapps.vaikaparts.exception.PaymentValidationException;
 import com.devikapps.vaikaparts.model.PaymentParty;
@@ -45,7 +46,7 @@ class MvolaPaymentGatewayTest extends MvolaApiTestBase {
 
   @BeforeEach
   void set_up_gateway() {
-    final var mvolaProperties = new MvolaProperties();
+    final var mvolaProperties = new MvolaConf();
     mvolaProperties.setConsumerKey(randomUUID().toString());
     mvolaProperties.setConsumerSecret(randomUUID().toString());
     mvolaProperties.setBaseUrl(mockWebServer.url(MERCHANT_PAY_BASE_PATH).toString());

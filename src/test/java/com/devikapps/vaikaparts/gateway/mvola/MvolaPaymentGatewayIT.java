@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.devikapps.vaikaparts.conf.FacadeIT;
+import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.model.PaymentParty;
 import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
@@ -24,13 +25,12 @@ class MvolaPaymentGatewayIT extends FacadeIT {
   private static final String DESCRIPTION = "Integration test payment";
   private static final String TOKEN_PREFIX = "eyJ";
 
-  @Autowired private MvolaProperties mvolaProperties;
+  @Autowired private MvolaConf mvolaConf;
   @Autowired private MvolaPaymentGateway subject;
 
   @Test
   void should_acquire_valid_jwt_bearer_token_from_sandbox() {
-    final MvolaTokenService tokenService =
-        new MvolaTokenService(mvolaProperties, new RestTemplate());
+    final MvolaTokenService tokenService = new MvolaTokenService(mvolaConf, new RestTemplate());
 
     final String token = tokenService.getToken();
 
@@ -41,8 +41,7 @@ class MvolaPaymentGatewayIT extends FacadeIT {
 
   @Test
   void should_return_same_cached_token_on_second_call() {
-    final MvolaTokenService tokenService =
-        new MvolaTokenService(mvolaProperties, new RestTemplate());
+    final MvolaTokenService tokenService = new MvolaTokenService(mvolaConf, new RestTemplate());
 
     final String firstToken = tokenService.getToken();
     final String secondToken = tokenService.getToken();

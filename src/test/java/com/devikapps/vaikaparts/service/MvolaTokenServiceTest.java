@@ -13,8 +13,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
-import com.devikapps.vaikaparts.gateway.mvola.MvolaProperties;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +35,7 @@ class MvolaTokenServiceTest {
   public static final String TEST_ACCESS_TOKEN = randomUUID().toString();
   private static final int EXPIRE_DURATION_IN_MS = 3_600;
 
-  @Mock private MvolaProperties properties;
+  @Mock private MvolaConf properties;
 
   @Mock private RestTemplate restTemplate;
 

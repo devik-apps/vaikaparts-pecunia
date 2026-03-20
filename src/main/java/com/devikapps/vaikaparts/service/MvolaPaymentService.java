@@ -6,6 +6,7 @@ import static org.owasp.encoder.Encode.forJava;
 import com.devikapps.vaikaparts.gateway.PaymentGatewayFactory;
 import com.devikapps.vaikaparts.model.PaymentRequest;
 import com.devikapps.vaikaparts.model.PaymentResponse;
+import com.devikapps.vaikaparts.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 public class MvolaPaymentService implements PaymentService {
 
   private final PaymentGatewayFactory gatewayFactory;
+  private final PaymentRepository paymentRepository;
 
   @Override
   public PaymentResponse initiatePayment(PaymentRequest request) {

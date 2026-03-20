@@ -3,8 +3,8 @@ package com.devikapps.vaikaparts.service;
 import static java.lang.String.format;
 import static java.time.LocalDateTime.now;
 
+import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
-import com.devikapps.vaikaparts.gateway.mvola.MvolaProperties;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Map;
@@ -25,13 +25,13 @@ public class MvolaTokenService {
   private static final String GRANT_TYPE = "client_credentials";
   private static final String SCOPE = "EXT_INT_MVOLA_SCOPE";
 
-  private final MvolaProperties properties;
+  private final MvolaConf properties;
   private final RestTemplate restTemplate;
 
   private volatile String cachedToken;
   private volatile LocalDateTime tokenExpiresAt;
 
-  public MvolaTokenService(MvolaProperties properties, final RestTemplate restTemplate) {
+  public MvolaTokenService(MvolaConf properties, final RestTemplate restTemplate) {
     this.properties = properties;
     this.restTemplate = restTemplate;
   }

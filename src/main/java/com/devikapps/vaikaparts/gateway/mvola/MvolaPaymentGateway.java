@@ -1,5 +1,6 @@
 package com.devikapps.vaikaparts.gateway.mvola;
 
+import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
 import static java.lang.String.format;
 import static java.time.format.DateTimeFormatter.ofPattern;
 import static java.util.UUID.randomUUID;
@@ -13,8 +14,10 @@ import com.devikapps.vaikaparts.model.classifier.PaymentProvider;
 import com.devikapps.vaikaparts.service.MvolaTokenService;
 import com.devikapps.vaikaparts.service.util.MvolaResponseParser;
 import com.devikapps.vaikaparts.validator.PaymentRequestValidator;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.wso2.client.api.ApiClient;
@@ -33,7 +36,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
   private final MvolaProperties properties;
   private final MvolaTokenService tokenService;
   private final MvolaResponseParser responseParser;
-  private final DefaultApi defaultApi;
+  private DefaultApi defaultApi;
 
   public MvolaPaymentGateway(
       final PaymentRequestValidator validator,
@@ -44,17 +47,25 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
     this.properties = properties;
     this.tokenService = tokenService;
     this.responseParser = responseParser;
-    this.defaultApi = buildDefaultApi();
+  }
+
+  @PostConstruct
+  public void init() {
+    defaultApi = buildDefaultApi();
   }
 
   @Override
   public PaymentProvider getProvider() {
-    return PaymentProvider.MVOLA;
+    return MVOLA;
   }
 
   @Override
   protected PaymentResponse doInitiatePayment(final PaymentRequest request) {
     final MvolaPaymentRequest mvolaRequest = (MvolaPaymentRequest) request;
+    log.info(
+        "Initiate MVOLA payment. Payer={}, Description={}",
+        mvolaRequest.getPayer().getPhoneNumber(),
+        mvolaRequest.getDescription());
     configureApiClientToken();
 
     try {
@@ -79,7 +90,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
       response.setTransactionId(request.getTransactionId());
       response.setAmount(request.getAmount());
       response.setCurrency(request.getCurrency());
-      response.setProvider(PaymentProvider.MVOLA);
+      response.setProvider(MVOLA);
 
       return response;
 
@@ -108,8 +119,8 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
               serverCorrelationId,
               API_VERSION,
               randomUUID().toString(),
-              String.format("msisdn;%s", properties.getPartnerMsisdn()),
-              properties.getPartnerName(),
+              null,
+              null,
               CACHE_CONTROL,
               null,
               null,
@@ -120,7 +131,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
       final String rawBody = executeAndReadBody(call);
       final MvolaPaymentResponse response = responseParser.paymentStatusParser.apply(rawBody);
 
-      response.setProvider(PaymentProvider.MVOLA);
+      response.setProvider(MVOLA);
       return response;
 
     } catch (ApiException e) {
@@ -139,6 +150,8 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
 
   @Override
   protected PaymentResponse doGetPaymentDetails(final String transactionReference) {
+    log.info(
+        "MVOLA: Get payment status detail of payment of transactionId={}", transactionReference);
     configureApiClientToken();
 
     try {
@@ -147,18 +160,18 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
               transactionReference,
               API_VERSION,
               randomUUID().toString(),
-              format("msisdn;%s", properties.getPartnerMsisdn()),
+              null,
               CACHE_CONTROL,
               null,
               null,
-              null,
-              null,
+              "application/json",
+              "UTF-8",
               null);
 
       final String rawBody = executeAndReadBody(call);
       final MvolaPaymentResponse response = responseParser.paymentDetailsParser.apply(rawBody);
 
-      response.setProvider(PaymentProvider.MVOLA);
+      response.setProvider(MVOLA);
       return response;
 
     } catch (ApiException e) {
@@ -178,7 +191,6 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
 
   private String executeAndReadBody(final okhttp3.Call call) throws IOException, ApiException {
     try (final okhttp3.Response response = call.execute()) {
-
       final String rawBody = response.body().string();
 
       if (!response.isSuccessful())
@@ -198,11 +210,14 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
         .amount(request.getAmount().toBigInteger().toString())
         .currency("Ar")
         .descriptionText(request.getDescription())
-        .requestDate(OffsetDateTime.now().format(ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ")))
+        .requestDate(
+            OffsetDateTime.now(ZoneOffset.UTC).format(ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")) + "Z")
         .requestingOrganisationTransactionReference(request.getTransactionId())
-        .originalTransactionReference("")
-        .addDebitPartyItem(buildParty("msisdn", request.getPayer().getPhoneNumber()))
-        .addCreditPartyItem(buildParty("msisdn", request.getPayee().getPhoneNumber()))
+        .originalTransactionReference(request.getTransactionId())
+        .addDebitPartyItem(
+            buildParty("msisdn", normalizeMsisdn(request.getPayer().getPhoneNumber())))
+        .addCreditPartyItem(
+            buildParty("msisdn", normalizeMsisdn(request.getPayee().getPhoneNumber())))
         .addMetadataItem(buildParty("partnerName", properties.getPartnerName()))
         .addMetadataItem(buildParty("fc", "USD"))
         .addMetadataItem(buildParty("amountFc", "1"));
@@ -210,6 +225,16 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
 
   private PostRequestDebitPartyInner buildParty(final String key, final String value) {
     return new PostRequestDebitPartyInner().key(key).value(value);
+  }
+
+  private String normalizeMsisdn(final String phoneNumber) {
+    if (phoneNumber == null) return null;
+
+    if (phoneNumber.startsWith("+261")) return format("0%s", phoneNumber.substring(4));
+
+    if (phoneNumber.startsWith("261")) return format("0%s", phoneNumber.substring(3));
+
+    return phoneNumber;
   }
 
   private String resolveCorrelationId(final MvolaPaymentRequest request) {
@@ -225,7 +250,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
   }
 
   private DefaultApi buildDefaultApi() {
-    var client = new ApiClient();
+    final var client = new ApiClient();
 
     client.setBasePath(properties.getBaseUrl());
     client.setVerifyingSsl(true);
@@ -234,7 +259,7 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
         "UserAccountIdentifier", format("msisdn;%s", properties.getPartnerMsisdn()));
     client.addDefaultHeader("partnerName", properties.getPartnerName());
 
-    var api = new DefaultApi(client);
+    final var api = new DefaultApi(client);
     api.setCustomBaseUrl(properties.getBaseUrl());
     return api;
   }

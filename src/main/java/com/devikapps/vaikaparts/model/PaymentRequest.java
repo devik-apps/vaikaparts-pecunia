@@ -1,5 +1,7 @@
 package com.devikapps.vaikaparts.model;
 
+import static java.lang.String.format;
+
 import com.devikapps.vaikaparts.model.classifier.PaymentCurrency;
 import com.devikapps.vaikaparts.model.classifier.PaymentProvider;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
@@ -8,7 +10,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @AllArgsConstructor
@@ -16,7 +17,6 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @Getter
 @Setter
-@ToString
 public abstract class PaymentRequest {
   private String transactionId;
   private BigDecimal amount;
@@ -26,4 +26,22 @@ public abstract class PaymentRequest {
   private PaymentParty payee;
   private PaymentProvider provider;
   private PaymentType type;
+
+  @Override
+  public String toString() {
+    return format(
+        """
+        {
+        \ttransaction_id=%s,\s
+        \tamount=%s,\s
+        \tcurrency=%s,\s
+        \tdescription=%s,\s
+        \tpayer=%s,\s
+        \tpayee=%s,\s
+        \tprovider=%s,\s
+        \ttype=%s\s
+        }
+        """,
+        transactionId, amount, currency, description, payer, payee, provider, type);
+  }
 }

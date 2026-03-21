@@ -1,6 +1,8 @@
 package com.devikapps.vaikaparts.service;
 
+import static com.devikapps.vaikaparts.event.model.VerificationStatus.FAILED;
 import static com.devikapps.vaikaparts.event.model.VerificationStatus.PENDING;
+import static com.devikapps.vaikaparts.event.model.VerificationStatus.SUCCESS;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
 import static java.lang.String.format;
@@ -8,8 +10,10 @@ import static java.time.LocalDateTime.now;
 import static java.util.UUID.randomUUID;
 import static org.owasp.encoder.Encode.forJava;
 
+import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
 import com.devikapps.vaikaparts.event.model.EventProducer;
 import com.devikapps.vaikaparts.event.model.PaymentVerificationRequested;
+import com.devikapps.vaikaparts.event.model.VerificationStatus;
 import com.devikapps.vaikaparts.gateway.PaymentGatewayFactory;
 import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.mapper.MvolaPaymentMapper;
@@ -111,6 +115,40 @@ public class MvolaPaymentService implements PaymentService {
                                 "No payment with transactionId=%s found", forJava(transactionId))));
 
     return mvolaPaymentMapper.toModel(payment);
+  }
+
+  @Transactional
+  public void handleCallBack(final MvolaCallBackRequest request) {
+    log.info(
+        "MVola handleCallBack for serverCorrelationId={}, status={}",
+        forJava(request.getServerCorrelationId()),
+        forJava(request.getTransactionStatus()));
+
+    final JMvolaPayment payment =
+        (JMvolaPayment)
+            paymentRepository
+                .findJPaymentByTransactionId(request.getServerCorrelationId())
+                .orElseThrow(
+                    () ->
+                        new EntityNotFoundException(
+                            format(
+                                "No payment found for serverCorrelationId=%s",
+                                forJava(request.getServerCorrelationId()))));
+
+    final VerificationStatus newStatus =
+        switch (request.getTransactionStatus().toLowerCase()) {
+          case "completed" -> SUCCESS;
+          case "failed" -> FAILED;
+          default -> PENDING;
+        };
+
+    payment.setStatus(newStatus);
+    payment.setMvolaTransactionId(request.getTransactionReference());
+    payment.setUpdatedAt(now());
+
+    paymentRepository.save(payment);
+
+    log.info("MVola callback processed — paymentId={}, newStatus={}", payment.getId(), newStatus);
   }
 
   private JMvolaPayment buildPaymentFromPaymentRequest(PaymentRequest request) {

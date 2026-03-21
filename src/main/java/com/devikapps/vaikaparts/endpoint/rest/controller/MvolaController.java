@@ -2,6 +2,7 @@ package com.devikapps.vaikaparts.endpoint.rest.controller;
 
 import static org.owasp.encoder.Encode.forJava;
 
+import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
 import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentRequest;
 import com.devikapps.vaikaparts.model.MvolaPayment;
 import com.devikapps.vaikaparts.service.MvolaPaymentService;
@@ -15,6 +16,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,5 +41,17 @@ public class MvolaController {
   public MvolaPayment getPayment(@PathVariable @NotNull String transactionId) {
     log.info("MVola Payment get at GET /v1/payments/mvola/{}", forJava(transactionId));
     return (MvolaPayment) mvolaPaymentService.getPayment(transactionId);
+  }
+
+  @PutMapping("/callback")
+  public ResponseEntity<Void> handleCallBack(
+      @RequestBody @NotNull final MvolaCallBackRequest request) {
+    log.info(
+        "PUT /v1/payments/mvola/callback — serverCorrelationId={}, status={}",
+        forJava(request.getServerCorrelationId()),
+        forJava(request.getTransactionReference()));
+
+    mvolaPaymentService.handleCallBack(request);
+    return ResponseEntity.ok().build();
   }
 }

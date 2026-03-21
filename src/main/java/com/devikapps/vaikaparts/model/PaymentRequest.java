@@ -5,6 +5,9 @@ import static java.lang.String.format;
 import com.devikapps.vaikaparts.model.classifier.PaymentCurrency;
 import com.devikapps.vaikaparts.model.classifier.PaymentProvider;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -19,11 +22,15 @@ import lombok.experimental.SuperBuilder;
 @Setter
 public abstract class PaymentRequest {
   private String transactionId;
+
+  @NotNull
+  @DecimalMin(value = "0.01", message = "amount must be greater than zero")
   private BigDecimal amount;
+
   private PaymentCurrency currency;
   private String description;
-  private PaymentParty payer;
-  private PaymentParty payee;
+  @NotNull @Valid private PaymentParty payer;
+  @NotNull @Valid private PaymentParty payee;
   private PaymentProvider provider;
   private PaymentType type;
 

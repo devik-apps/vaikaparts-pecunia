@@ -31,7 +31,8 @@ public class MvolaController {
   private final MvolaPaymentService mvolaPaymentService;
 
   @PostMapping
-  public ResponseEntity<MvolaPayment> initiatePayment(@Valid @NotNull MvolaPaymentRequest request) {
+  public ResponseEntity<MvolaPayment> initiatePayment(
+      @Valid @NotNull @RequestBody MvolaPaymentRequest request) {
     log.info("MVola Payment initiation at POST /v1/payments/mvola");
     return new ResponseEntity<>(
         (MvolaPayment) mvolaPaymentService.initiatePayment(request), HttpStatus.CREATED);

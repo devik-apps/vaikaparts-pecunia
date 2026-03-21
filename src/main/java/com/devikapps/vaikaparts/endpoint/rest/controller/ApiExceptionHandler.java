@@ -245,7 +245,7 @@ public class ApiExceptionHandler {
     log.warn(
         "Validation failed at path: {}, message: {}",
         forJava(getRequestPath(request)),
-        forJava(message));
+        ex.getMessage());
 
     var errorResponse =
         ErrorResponse.of(HttpStatus.BAD_REQUEST, message, getRequestPath(request), "BAD_FORM");

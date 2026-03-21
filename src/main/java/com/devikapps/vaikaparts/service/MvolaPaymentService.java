@@ -16,7 +16,6 @@ import com.devikapps.vaikaparts.mapper.MvolaPaymentMapper;
 import com.devikapps.vaikaparts.mapper.PaymentPartyMapper;
 import com.devikapps.vaikaparts.model.Payment;
 import com.devikapps.vaikaparts.model.PaymentRequest;
-import com.devikapps.vaikaparts.model.PaymentResponse;
 import com.devikapps.vaikaparts.repository.PaymentRepository;
 import com.devikapps.vaikaparts.repository.PaymentRequestedRepository;
 import com.devikapps.vaikaparts.repository.model.JMvolaPayment;
@@ -46,7 +45,7 @@ public class MvolaPaymentService implements PaymentService {
 
   @Override
   @Transactional
-  public PaymentResponse initiatePayment(PaymentRequest request) {
+  public Payment initiatePayment(PaymentRequest request) {
     log.info(
         "MVola initiatePayment for phoneNumber={}", forJava(request.getPayer().getPhoneNumber()));
 
@@ -89,10 +88,13 @@ public class MvolaPaymentService implements PaymentService {
         response.getServerCorrelationId());
     payment.setTransactionId(response.getServerCorrelationId());
     payment.setServerCorrelationId(response.getServerCorrelationId());
+    payment.setNotificationMethod(response.getNotificationMethod());
+
     response.setTransactionId(response.getServerCorrelationId());
+
     paymentRepository.save(payment);
 
-    return response;
+    return mvolaPaymentMapper.toModel(payment);
   }
 
   @Override

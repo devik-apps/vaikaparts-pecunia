@@ -13,10 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.devikapps.vaikaparts.conf.FacadeIT;
 import com.devikapps.vaikaparts.event.model.VerificationStatus;
 import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentRequest;
-import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.mapper.PaymentPartyMapper;
+import com.devikapps.vaikaparts.model.MvolaPayment;
 import com.devikapps.vaikaparts.model.classifier.Country;
-import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
 import com.devikapps.vaikaparts.repository.PaymentPartyRepository;
 import com.devikapps.vaikaparts.repository.PaymentRepository;
@@ -56,7 +55,7 @@ class MvolaPaymentServiceIT extends FacadeIT {
   void should_persist_payment_with_pending_status_after_initiate() throws InterruptedException {
     final MvolaPaymentRequest request = buildValidRequest();
 
-    final MvolaPaymentResponse response = (MvolaPaymentResponse) subject.initiatePayment(request);
+    final var response = (MvolaPayment) subject.initiatePayment(request);
 
     Thread.sleep(CONSUMER_WAIT_MS);
 
@@ -79,7 +78,7 @@ class MvolaPaymentServiceIT extends FacadeIT {
   @Test
   void should_update_payment_transaction_id_to_server_correlation_id() throws InterruptedException {
     final MvolaPaymentRequest request = buildValidRequest();
-    final MvolaPaymentResponse response = (MvolaPaymentResponse) subject.initiatePayment(request);
+    final var response = (MvolaPayment) subject.initiatePayment(request);
 
     Thread.sleep(CONSUMER_WAIT_MS);
 
@@ -100,12 +99,11 @@ class MvolaPaymentServiceIT extends FacadeIT {
 
   @Test
   void should_return_pending_status_from_mvola_on_initiate() throws InterruptedException {
-    final MvolaPaymentResponse response =
-        (MvolaPaymentResponse) subject.initiatePayment(buildValidRequest());
+    final MvolaPayment response = (MvolaPayment) subject.initiatePayment(buildValidRequest());
 
     Thread.sleep(CONSUMER_WAIT_MS);
 
-    assertEquals(PaymentStatus.PENDING, response.getStatus());
+    assertEquals(VerificationStatus.PENDING, response.getStatus());
     assertEquals(MVOLA, response.getProvider());
     assertTrue(
         response.getNotificationMethod().equals("polling")
@@ -114,8 +112,7 @@ class MvolaPaymentServiceIT extends FacadeIT {
 
   @Test
   void should_return_server_correlation_id_as_transaction_id() throws InterruptedException {
-    final MvolaPaymentResponse response =
-        (MvolaPaymentResponse) subject.initiatePayment(buildValidRequest());
+    final MvolaPayment response = (MvolaPayment) subject.initiatePayment(buildValidRequest());
 
     Thread.sleep(CONSUMER_WAIT_MS);
 
@@ -126,7 +123,7 @@ class MvolaPaymentServiceIT extends FacadeIT {
   void should_create_payment_verification_requested_event_log_in_database()
       throws InterruptedException {
     final MvolaPaymentRequest request = buildValidRequest();
-    final MvolaPaymentResponse response = (MvolaPaymentResponse) subject.initiatePayment(request);
+    final MvolaPayment response = (MvolaPayment) subject.initiatePayment(request);
 
     Thread.sleep(CONSUMER_WAIT_MS);
 
@@ -153,8 +150,7 @@ class MvolaPaymentServiceIT extends FacadeIT {
   @Test
   void should_have_pending_status_on_event_log_after_first_consumer_execution()
       throws InterruptedException {
-    final MvolaPaymentResponse response =
-        (MvolaPaymentResponse) subject.initiatePayment(buildValidRequest());
+    final MvolaPayment response = (MvolaPayment) subject.initiatePayment(buildValidRequest());
 
     Thread.sleep(CONSUMER_WAIT_MS);
 
@@ -176,8 +172,7 @@ class MvolaPaymentServiceIT extends FacadeIT {
 
   @Test
   void should_retrieve_persisted_payment_by_transaction_id() throws InterruptedException {
-    final MvolaPaymentResponse response =
-        (MvolaPaymentResponse) subject.initiatePayment(buildValidRequest());
+    final MvolaPayment response = (MvolaPayment) subject.initiatePayment(buildValidRequest());
 
     Thread.sleep(CONSUMER_WAIT_MS);
 

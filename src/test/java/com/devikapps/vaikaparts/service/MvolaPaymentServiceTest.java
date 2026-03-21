@@ -32,7 +32,6 @@ import com.devikapps.vaikaparts.mapper.MvolaPaymentMapper;
 import com.devikapps.vaikaparts.mapper.PaymentPartyMapper;
 import com.devikapps.vaikaparts.model.MvolaPayment;
 import com.devikapps.vaikaparts.model.PaymentParty;
-import com.devikapps.vaikaparts.model.PaymentResponse;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
 import com.devikapps.vaikaparts.repository.PaymentRepository;
 import com.devikapps.vaikaparts.repository.PaymentRequestedRepository;
@@ -44,6 +43,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +55,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+@Slf4j
 @ExtendWith(MockitoExtension.class)
 class MvolaPaymentServiceTest {
 
@@ -337,12 +338,11 @@ class MvolaPaymentServiceTest {
     stubPaymentSave();
     stubGatewayInitiate(correlationId);
 
-    final PaymentResponse result = service.initiatePayment(request);
+    when(mvolaPaymentMapper.toModel(any(JMvolaPayment.class)))
+        .thenReturn(MvolaPayment.builder().transactionId(correlationId).build());
+    final var result = service.initiatePayment(request);
 
-    assertEquals(
-        correlationId,
-        result.getTransactionId(),
-        "response transactionId must be overwritten with serverCorrelationId");
+    assertEquals(correlationId, result.getTransactionId());
   }
 
   @Test

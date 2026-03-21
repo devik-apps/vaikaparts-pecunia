@@ -73,16 +73,20 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
         payment.getTransactionId(),
         event.getId());
 
+    var now = now();
+
     payment.setStatus(VerificationStatus.SUCCESS);
-    payment.setUpdatedAt(now());
+    payment.setUpdatedAt(now);
     paymentRepository.save(payment);
 
     paymentVerificationRequested.setStatus(VerificationStatus.SUCCESS);
     paymentVerificationRequested.setAttemptNb(event.getAttemptNb());
     paymentVerificationRequested.setErrorMessage(null);
-    paymentVerificationRequested.setLastVerifiedAt(now());
-    paymentVerificationRequested.setCompletedAt(now());
-    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now);
+    paymentVerificationRequested.setCompletedAt(now);
+    paymentVerificationRequested.setLastVerifiedAt(now);
+    paymentVerificationRequested.setCompletedAt(now);
+
     paymentRequestedRepository.save(paymentVerificationRequested);
   }
 
@@ -93,6 +97,8 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
 
     final var currentAttempt = event.getAttemptNb();
     final var maxAttempts = event.getMaxVerificationAttemptNb();
+
+    final var now = now();
 
     if (currentAttempt >= maxAttempts) {
       log.warn(
@@ -116,8 +122,8 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
 
     paymentVerificationRequested.setStatus(VerificationStatus.PENDING);
     paymentVerificationRequested.setAttemptNb(currentAttempt);
-    paymentVerificationRequested.setLastVerifiedAt(now());
-    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now);
+
     paymentRequestedRepository.save(paymentVerificationRequested);
   }
 
@@ -125,6 +131,8 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
       final JPayment payment,
       JPaymentVerificationRequested paymentVerificationRequested,
       final PaymentVerificationRequested event) {
+
+    final var now = now();
 
     final var failedAttempts = paymentVerificationRequested.getFailedAttemptNb() + 1;
     paymentVerificationRequested.setFailedAttemptNb(failedAttempts);
@@ -149,8 +157,9 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
         failedAttempts,
         MAX_FAILED_RETRIES);
 
-    paymentVerificationRequested.setLastVerifiedAt(now());
-    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now);
+    paymentVerificationRequested.setLastVerifiedAt(now);
+
     paymentRequestedRepository.save(paymentVerificationRequested);
   }
 
@@ -159,16 +168,20 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
       JPaymentVerificationRequested paymentVerificationRequested,
       final PaymentVerificationRequested event,
       final String reason) {
+
+    final var now = now();
+
     payment.setStatus(VerificationStatus.FAILED);
-    payment.setUpdatedAt(now());
+    payment.setUpdatedAt(now);
     paymentRepository.save(payment);
 
     paymentVerificationRequested.setStatus(VerificationStatus.FAILED);
     paymentVerificationRequested.setAttemptNb(event.getAttemptNb());
     paymentVerificationRequested.setErrorMessage(reason);
-    paymentVerificationRequested.setLastVerifiedAt(now());
-    paymentVerificationRequested.setCompletedAt(now());
-    paymentVerificationRequested.setLastVerifiedAt(now());
+    paymentVerificationRequested.setLastVerifiedAt(now);
+    paymentVerificationRequested.setCompletedAt(now);
+    paymentVerificationRequested.setLastVerifiedAt(now);
+
     paymentRequestedRepository.save(paymentVerificationRequested);
   }
 

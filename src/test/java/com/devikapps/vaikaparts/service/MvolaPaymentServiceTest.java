@@ -1,7 +1,9 @@
 package com.devikapps.vaikaparts.service;
 
+import static com.devikapps.vaikaparts.conf.EnvConf.MVOLA_MSISDN;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
+import static com.devikapps.vaikaparts.model.classifier.PaymentStatus.PENDING;
 import static java.time.LocalDateTime.now;
 import static java.util.UUID.randomUUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,28 +33,34 @@ import com.devikapps.vaikaparts.mapper.PaymentPartyMapper;
 import com.devikapps.vaikaparts.model.MvolaPayment;
 import com.devikapps.vaikaparts.model.PaymentParty;
 import com.devikapps.vaikaparts.model.PaymentResponse;
-import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
 import com.devikapps.vaikaparts.repository.PaymentRepository;
+import com.devikapps.vaikaparts.repository.PaymentRequestedRepository;
 import com.devikapps.vaikaparts.repository.model.JMvolaPayment;
-import com.devikapps.vaikaparts.repository.model.JPayment;
 import com.devikapps.vaikaparts.repository.model.JPaymentParty;
+import com.devikapps.vaikaparts.repository.model.JPaymentVerificationRequested;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class MvolaPaymentServiceTest {
 
   @Mock private PaymentGatewayFactory gatewayFactory;
   @Mock private PaymentRepository paymentRepository;
+  @Mock private PaymentRequestedRepository paymentRequestedRepository;
   @Mock private EventProducer<PaymentVerificationRequested> eventProducer;
   @Mock private PaymentPartyMapper paymentPartyMapper;
   @Mock private MvolaPaymentMapper mvolaPaymentMapper;
@@ -58,28 +68,37 @@ class MvolaPaymentServiceTest {
 
   private MvolaPaymentService service;
 
-  @Test
-  void should_save_payment_with_pending_status_before_calling_gateway() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
+  @BeforeEach
+  void set_up() {
+    TransactionSynchronizationManager.initSynchronization();
     service =
         new MvolaPaymentService(
             gatewayFactory,
             paymentRepository,
+            paymentRequestedRepository,
             eventProducer,
             paymentPartyMapper,
             mvolaPaymentMapper);
+  }
 
+  @AfterEach
+  void tear_down() {
+    TransactionSynchronizationManager.clearSynchronization();
+  }
+
+  @Test
+  void should_save_payment_with_pending_status_on_first_save() {
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
 
-    final ArgumentCaptor<JPayment> captor = ArgumentCaptor.forClass(JPayment.class);
+    final ArgumentCaptor<JMvolaPayment> captor = ArgumentCaptor.forClass(JMvolaPayment.class);
     verify(paymentRepository, atLeastOnce()).save(captor.capture());
 
-    final JPayment firstSave = captor.getAllValues().getFirst();
+    final JMvolaPayment firstSave = captor.getAllValues().getFirst();
     assertEquals(VerificationStatus.PENDING, firstSave.getStatus());
     assertEquals(MVOLA, firstSave.getProvider());
     assertEquals(AR, firstSave.getCurrency());
@@ -89,165 +108,163 @@ class MvolaPaymentServiceTest {
 
   @Test
   void should_save_payment_with_correct_type() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
 
-    final ArgumentCaptor<JPayment> captor = ArgumentCaptor.forClass(JPayment.class);
+    final ArgumentCaptor<JMvolaPayment> captor = ArgumentCaptor.forClass(JMvolaPayment.class);
     verify(paymentRepository, atLeastOnce()).save(captor.capture());
     assertEquals(request.getType(), captor.getAllValues().getFirst().getType());
   }
 
   @Test
   void should_set_created_at_and_updated_at_on_payment_creation() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     final LocalDateTime before = now().minusSeconds(1);
     service.initiatePayment(request);
     final LocalDateTime after = now().plusSeconds(1);
 
-    final ArgumentCaptor<JPayment> captor = ArgumentCaptor.forClass(JPayment.class);
+    final ArgumentCaptor<JMvolaPayment> captor = ArgumentCaptor.forClass(JMvolaPayment.class);
     verify(paymentRepository, atLeastOnce()).save(captor.capture());
-    final JPayment payment = captor.getAllValues().getFirst();
+    final JMvolaPayment payment = captor.getAllValues().getFirst();
 
     assertTrue(payment.getCreatedAt().isAfter(before) && payment.getCreatedAt().isBefore(after));
     assertTrue(payment.getUpdatedAt().isAfter(before) && payment.getUpdatedAt().isBefore(after));
   }
 
   @Test
-  void should_update_payment_transaction_id_from_gateway_response() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
+  void should_update_payment_transaction_id_to_server_correlation_id_on_last_save() {
     final MvolaPaymentRequest request = buildValidRequest();
-    final String serverCorrelationId = randomUUID().toString();
+    final String correlationId = randomUUID().toString();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(serverCorrelationId);
+    stubGatewayInitiate(correlationId);
 
     service.initiatePayment(request);
 
-    final ArgumentCaptor<JPayment> captor = ArgumentCaptor.forClass(JPayment.class);
+    final ArgumentCaptor<JMvolaPayment> captor = ArgumentCaptor.forClass(JMvolaPayment.class);
     verify(paymentRepository, atLeastOnce()).save(captor.capture());
-    final JPayment lastSave = captor.getAllValues().getLast();
-    assertEquals(serverCorrelationId, lastSave.getTransactionId());
+    assertEquals(correlationId, captor.getAllValues().getLast().getTransactionId());
+  }
+
+  @Test
+  void should_update_server_correlation_id_on_last_save() {
+    final MvolaPaymentRequest request = buildValidRequest();
+    final String correlationId = randomUUID().toString();
+    stubMappers(request);
+    stubPaymentSave();
+    stubGatewayInitiate(correlationId);
+
+    service.initiatePayment(request);
+
+    final ArgumentCaptor<JMvolaPayment> captor = ArgumentCaptor.forClass(JMvolaPayment.class);
+    verify(paymentRepository, atLeastOnce()).save(captor.capture());
+    assertEquals(correlationId, captor.getAllValues().getLast().getServerCorrelationId());
   }
 
   @Test
   void should_save_payment_at_least_twice_on_successful_initiate() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
 
-    // First save: initial persist. Second save: update with transactionId from gateway.
-    verify(paymentRepository, atLeast(2)).save(any(JPayment.class));
+    verify(paymentRepository, atLeast(2)).save(any(JMvolaPayment.class));
   }
 
   @Test
-  void should_publish_payment_verification_requested_event_exactly_once() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
+  void should_save_payment_verification_requested_log_before_gateway_call() {
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
 
-    verify(eventProducer, times(1)).accept(any());
+    final InOrder order = inOrder(paymentRequestedRepository, mvolaGateway);
+    order.verify(paymentRequestedRepository).save(any(JPaymentVerificationRequested.class));
+    order.verify(mvolaGateway).initiatePayment(any());
   }
 
   @Test
-  void should_publish_event_with_correct_payment_id() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
+  void should_save_payment_verification_requested_log_with_pending_status() {
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
-    final JPayment savedPayment = stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubPaymentSave();
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
+
+    final ArgumentCaptor<JPaymentVerificationRequested> captor =
+        ArgumentCaptor.forClass(JPaymentVerificationRequested.class);
+    verify(paymentRequestedRepository).save(captor.capture());
+    assertEquals(VerificationStatus.PENDING, captor.getValue().getStatus());
+  }
+
+  @Test
+  void should_save_payment_verification_requested_log_with_max_attempt_nb_5() {
+    final MvolaPaymentRequest request = buildValidRequest();
+    stubMappers(request);
+    stubPaymentSave();
+    stubGatewayInitiate(randomUUID().toString());
+
+    service.initiatePayment(request);
+
+    final ArgumentCaptor<JPaymentVerificationRequested> captor =
+        ArgumentCaptor.forClass(JPaymentVerificationRequested.class);
+    verify(paymentRequestedRepository).save(captor.capture());
+    assertEquals(5, captor.getValue().getMaxVerificationAttemptNb());
+  }
+
+  @Test
+  void should_save_payment_verification_requested_log_linked_to_payment() {
+    final MvolaPaymentRequest request = buildValidRequest();
+    stubMappers(request);
+    final JMvolaPayment savedPayment = stubPaymentSave();
+    stubGatewayInitiate(randomUUID().toString());
+
+    service.initiatePayment(request);
+
+    final ArgumentCaptor<JPaymentVerificationRequested> captor =
+        ArgumentCaptor.forClass(JPaymentVerificationRequested.class);
+    verify(paymentRequestedRepository).save(captor.capture());
+    assertEquals(savedPayment.getId(), captor.getValue().getPayment().getId());
+  }
+
+  @Test
+  void should_publish_event_after_commit_with_correct_payment_id() {
+    final MvolaPaymentRequest request = buildValidRequest();
+    stubMappers(request);
+    final JMvolaPayment savedPayment = stubPaymentSave();
+    stubGatewayInitiate(randomUUID().toString());
+
+    service.initiatePayment(request);
+    flushSynchronizations();
 
     final ArgumentCaptor<List<PaymentVerificationRequested>> captor =
         ArgumentCaptor.forClass(List.class);
     verify(eventProducer).accept(captor.capture());
-
     assertEquals(savedPayment.getId(), captor.getValue().getFirst().getPaymentId());
   }
 
   @Test
   void should_publish_event_with_max_verification_attempt_nb_of_5() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
+    flushSynchronizations();
 
     final ArgumentCaptor<List<PaymentVerificationRequested>> captor =
         ArgumentCaptor.forClass(List.class);
@@ -257,21 +274,13 @@ class MvolaPaymentServiceTest {
 
   @Test
   void should_publish_a_list_containing_exactly_one_event() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
+    flushSynchronizations();
 
     final ArgumentCaptor<List<PaymentVerificationRequested>> captor =
         ArgumentCaptor.forClass(List.class);
@@ -281,21 +290,13 @@ class MvolaPaymentServiceTest {
 
   @Test
   void should_publish_event_with_non_blank_id() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
+    flushSynchronizations();
 
     final ArgumentCaptor<List<PaymentVerificationRequested>> captor =
         ArgumentCaptor.forClass(List.class);
@@ -305,20 +306,23 @@ class MvolaPaymentServiceTest {
   }
 
   @Test
-  void should_delegate_to_mvola_gateway_on_initiate_payment() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
+  void should_not_publish_event_before_commit() {
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
-    stubGatewayInitiate(request.getTransactionId());
+    stubGatewayInitiate(randomUUID().toString());
+
+    service.initiatePayment(request);
+
+    verify(eventProducer, never()).accept(any());
+  }
+
+  @Test
+  void should_delegate_to_mvola_gateway_on_initiate_payment() {
+    final MvolaPaymentRequest request = buildValidRequest();
+    stubMappers(request);
+    stubPaymentSave();
+    stubGatewayInitiate(randomUUID().toString());
 
     service.initiatePayment(request);
 
@@ -326,41 +330,27 @@ class MvolaPaymentServiceTest {
   }
 
   @Test
-  void should_return_gateway_response_from_initiate_payment() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
+  void should_return_response_with_transaction_id_equal_to_server_correlation_id() {
     final MvolaPaymentRequest request = buildValidRequest();
-    final MvolaPaymentResponse expected = buildPendingResponse(request.getTransactionId());
+    final String correlationId = randomUUID().toString();
     stubMappers(request);
     stubPaymentSave();
-    when(mvolaGateway.initiatePayment(request)).thenReturn(expected);
+    stubGatewayInitiate(correlationId);
 
     final PaymentResponse result = service.initiatePayment(request);
 
-    assertSame(expected, result);
+    assertEquals(
+        correlationId,
+        result.getTransactionId(),
+        "response transactionId must be overwritten with serverCorrelationId");
   }
 
   @Test
   void should_propagate_payment_gateway_exception_from_gateway() {
-    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final MvolaPaymentRequest request = buildValidRequest();
     stubMappers(request);
     stubPaymentSave();
+    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
     when(mvolaGateway.initiatePayment(any()))
         .thenThrow(new PaymentGatewayException("MVola initiatePayment failed"));
 
@@ -369,14 +359,6 @@ class MvolaPaymentServiceTest {
 
   @Test
   void should_return_mvola_payment_mapped_from_persistence() {
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final String transactionId = randomUUID().toString();
     final JMvolaPayment jPayment = buildJMvolaPayment(transactionId);
     final MvolaPayment expected = MvolaPayment.builder().build();
@@ -392,14 +374,6 @@ class MvolaPaymentServiceTest {
 
   @Test
   void should_throw_entity_not_found_when_payment_does_not_exist() {
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     when(paymentRepository.findJPaymentByTransactionId(any())).thenReturn(Optional.empty());
 
     final EntityNotFoundException ex =
@@ -410,14 +384,6 @@ class MvolaPaymentServiceTest {
 
   @Test
   void should_query_repository_with_exact_transaction_id_on_get_payment() {
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final String transactionId = "tx-abc-123";
     final JMvolaPayment jPayment = buildJMvolaPayment(transactionId);
     when(paymentRepository.findJPaymentByTransactionId(transactionId))
@@ -431,14 +397,6 @@ class MvolaPaymentServiceTest {
 
   @Test
   void should_delegate_to_mvola_payment_mapper_on_get_payment() {
-    service =
-        new MvolaPaymentService(
-            gatewayFactory,
-            paymentRepository,
-            eventProducer,
-            paymentPartyMapper,
-            mvolaPaymentMapper);
-
     final String transactionId = randomUUID().toString();
     final JMvolaPayment jPayment = buildJMvolaPayment(transactionId);
     when(paymentRepository.findJPaymentByTransactionId(transactionId))
@@ -450,22 +408,27 @@ class MvolaPaymentServiceTest {
     verify(mvolaPaymentMapper, times(1)).toModel(jPayment);
   }
 
-  private MvolaPaymentRequest buildValidRequest() {
-    final MvolaPaymentRequest request = new MvolaPaymentRequest();
-    request.setTransactionId(randomUUID().toString());
-    request.setAmount(new BigDecimal("5000"));
-    request.setCurrency(AR);
-    request.setDescription("Test payment");
-    request.setProvider(MVOLA);
-    request.setType(PaymentType.PROFILE_UNLOCK);
-    request.setPayer(PaymentParty.builder().phoneNumber("0343500003").build());
-    request.setPayee(PaymentParty.builder().phoneNumber("0343500004").build());
-    return request;
+  private void flushSynchronizations() {
+    TransactionSynchronizationManager.getSynchronizations()
+        .forEach(TransactionSynchronization::afterCommit);
   }
 
-  private JPayment stubPaymentSave() {
-    final JPayment payment =
-        JPayment.builder()
+  private MvolaPaymentRequest buildValidRequest() {
+    return MvolaPaymentRequest.builder()
+        .transactionId(randomUUID().toString())
+        .amount(new BigDecimal("5000"))
+        .currency(AR)
+        .description("Test payment")
+        .provider(MVOLA)
+        .type(PaymentType.PROFILE_UNLOCK)
+        .payer(PaymentParty.builder().phoneNumber("0343500003").build())
+        .payee(PaymentParty.builder().phoneNumber(MVOLA_MSISDN).build())
+        .build();
+  }
+
+  private JMvolaPayment stubPaymentSave() {
+    final JMvolaPayment payment =
+        JMvolaPayment.builder()
             .id(randomUUID().toString())
             .status(VerificationStatus.PENDING)
             .provider(MVOLA)
@@ -476,7 +439,7 @@ class MvolaPaymentServiceTest {
             .createdAt(now())
             .updatedAt(now())
             .build();
-    when(paymentRepository.save(any(JPayment.class))).thenReturn(payment);
+    when(paymentRepository.save(any(JMvolaPayment.class))).thenReturn(payment);
     return payment;
   }
 
@@ -485,19 +448,20 @@ class MvolaPaymentServiceTest {
     when(paymentPartyMapper.toPersistence(request.getPayee())).thenReturn(new JPaymentParty());
   }
 
-  private void stubGatewayInitiate(final String transactionId) {
-    when(mvolaGateway.initiatePayment(any())).thenReturn(buildPendingResponse(transactionId));
+  private void stubGatewayInitiate(final String serverCorrelationId) {
+    when(gatewayFactory.getGateway(MVOLA)).thenReturn(mvolaGateway);
+    when(mvolaGateway.initiatePayment(any())).thenReturn(buildPendingResponse(serverCorrelationId));
   }
 
-  private MvolaPaymentResponse buildPendingResponse(final String transactionId) {
-    final MvolaPaymentResponse response = new MvolaPaymentResponse();
-    response.setTransactionId(transactionId);
-    response.setStatus(PaymentStatus.PENDING);
-    response.setProvider(MVOLA);
-    response.setServerCorrelationId(randomUUID().toString());
-    response.setNotificationMethod("polling");
-    response.setRespondedAt(now());
-    return response;
+  private MvolaPaymentResponse buildPendingResponse(final String serverCorrelationId) {
+    return MvolaPaymentResponse.builder()
+        .transactionId(serverCorrelationId)
+        .status(PENDING)
+        .provider(MVOLA)
+        .serverCorrelationId(serverCorrelationId)
+        .notificationMethod("polling")
+        .respondedAt(now())
+        .build();
   }
 
   private JMvolaPayment buildJMvolaPayment(final String transactionId) {

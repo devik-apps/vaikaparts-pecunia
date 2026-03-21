@@ -18,8 +18,8 @@ import com.devikapps.vaikaparts.model.Payment;
 import com.devikapps.vaikaparts.model.PaymentRequest;
 import com.devikapps.vaikaparts.model.PaymentResponse;
 import com.devikapps.vaikaparts.repository.PaymentRepository;
+import com.devikapps.vaikaparts.repository.PaymentRequestedRepository;
 import com.devikapps.vaikaparts.repository.model.JMvolaPayment;
-import com.devikapps.vaikaparts.repository.model.JPayment;
 import com.devikapps.vaikaparts.repository.model.JPaymentVerificationRequested;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
@@ -27,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.validation.annotation.Validated;
 
 @Slf4j
@@ -37,6 +39,7 @@ public class MvolaPaymentService implements PaymentService {
 
   private final PaymentGatewayFactory gatewayFactory;
   private final PaymentRepository paymentRepository;
+  private final PaymentRequestedRepository paymentRequestedRepository;
   private final EventProducer<PaymentVerificationRequested> eventProducer;
   private final PaymentPartyMapper paymentPartyMapper;
   private final MvolaPaymentMapper mvolaPaymentMapper;
@@ -66,16 +69,29 @@ public class MvolaPaymentService implements PaymentService {
             .maxVerificationAttemptNb(5)
             .build();
 
+    paymentRequestedRepository.save(paymentVerificationRequestedInstance);
     log.info(
         "MVola initiatePayment. PaymentVerificationRequested event created with id={}",
         paymentVerificationRequested.getId());
 
-    eventProducer.accept(List.of(paymentVerificationRequested));
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            eventProducer.accept(List.of(paymentVerificationRequested));
+          }
+        });
 
     var response = (MvolaPaymentResponse) gatewayFactory.getGateway(MVOLA).initiatePayment(request);
-    payment.setTransactionId(response.getTransactionId());
+
+    log.info(
+        "MVola initiatePayment. MVola Gateway have response with transactionId={}",
+        response.getServerCorrelationId());
+    payment.setTransactionId(response.getServerCorrelationId());
+    payment.setServerCorrelationId(response.getServerCorrelationId());
     response.setTransactionId(response.getServerCorrelationId());
     paymentRepository.save(payment);
+
     return response;
   }
 
@@ -95,7 +111,7 @@ public class MvolaPaymentService implements PaymentService {
     return mvolaPaymentMapper.toModel(payment);
   }
 
-  private JPayment buildPaymentFromPaymentRequest(PaymentRequest request) {
+  private JMvolaPayment buildPaymentFromPaymentRequest(PaymentRequest request) {
     final var createdAt = now();
 
     var payment =

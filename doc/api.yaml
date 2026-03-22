@@ -181,7 +181,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         500:
           $ref: '#/components/responses/InternalServer'
-  /v1/payments/mvola/{customer-msisdn}:
+  /v1/payments/mvola/customer/{customer-msisdn}:
     get:
       tags:
         - MVola

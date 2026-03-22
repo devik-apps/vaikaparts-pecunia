@@ -20,7 +20,7 @@ public abstract class AbstractPaymentGateway implements PaymentGateway {
     log.info(
         "Initiating payment via provider '{}' with transactionId '{}'",
         getProvider(),
-        request.getTransactionId());
+        forJava(request.getTransactionId()));
     return doInitiatePayment(request);
   }
 

@@ -65,8 +65,8 @@ public class MvolaPaymentGateway extends AbstractPaymentGateway {
     final MvolaPaymentRequest mvolaRequest = (MvolaPaymentRequest) request;
     log.info(
         "Initiate MVOLA payment. Payer={}, Description={}",
-        mvolaRequest.getPayer().getPhoneNumber(),
-        mvolaRequest.getDescription());
+        forJava(mvolaRequest.getPayer().getPhoneNumber()),
+        forJava(mvolaRequest.getDescription()));
     configureApiClientToken();
 
     try {

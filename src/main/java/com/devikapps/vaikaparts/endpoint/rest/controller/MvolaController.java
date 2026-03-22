@@ -45,7 +45,9 @@ public class MvolaController {
       @PathVariable(name = "customer-msisdn") @NotNull String customerMsisdn,
       @RequestParam(name = "page", required = false) Integer page,
       @RequestParam(name = "size", required = false) Integer size) {
-    log.info("Mvola Payment get by customer msisdn at GET /v1/payments/mvola/{}", customerMsisdn);
+    log.info(
+        "Mvola Payment get by customer msisdn at GET /v1/payments/mvola/{}",
+        forJava(customerMsisdn));
     return mvolaPaymentService.findPaymentsByPaymentPartyMsisdn(customerMsisdn, page, size);
   }
 

@@ -29,39 +29,6 @@ class PaymentRequestValidatorTest {
   }
 
   @Test
-  void should_throw_when_transaction_id_is_null() {
-    final TestPaymentRequest request = buildValidRequest();
-    request.setTransactionId(null);
-
-    final PaymentValidationException ex =
-        assertThrows(PaymentValidationException.class, () -> subject.validate(request));
-
-    assertEquals("Field 'transactionId' must not be null or blank.", ex.getMessage());
-  }
-
-  @Test
-  void should_throw_when_transaction_id_is_blank() {
-    final TestPaymentRequest request = buildValidRequest();
-    request.setTransactionId("   ");
-
-    final PaymentValidationException ex =
-        assertThrows(PaymentValidationException.class, () -> subject.validate(request));
-
-    assertEquals("Field 'transactionId' must not be null or blank.", ex.getMessage());
-  }
-
-  @Test
-  void should_throw_when_transaction_id_is_empty() {
-    final TestPaymentRequest request = buildValidRequest();
-    request.setTransactionId("");
-
-    final PaymentValidationException ex =
-        assertThrows(PaymentValidationException.class, () -> subject.validate(request));
-
-    assertEquals("Field 'transactionId' must not be null or blank.", ex.getMessage());
-  }
-
-  @Test
   void should_throw_when_amount_is_null() {
     final TestPaymentRequest request = buildValidRequest();
     request.setAmount(null);
@@ -221,14 +188,6 @@ class PaymentRequestValidatorTest {
         assertThrows(PaymentValidationException.class, () -> subject.validate(request));
 
     assertEquals("Field 'payee.phoneNumber' must not be null or blank.", ex.getMessage());
-  }
-
-  @Test
-  void should_throw_payment_validation_exception_and_not_a_generic_runtime_exception() {
-    final TestPaymentRequest request = buildValidRequest();
-    request.setTransactionId(null);
-
-    assertThrows(PaymentValidationException.class, () -> subject.validate(request));
   }
 
   private TestPaymentRequest buildValidRequest() {

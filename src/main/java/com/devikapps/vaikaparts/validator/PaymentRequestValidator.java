@@ -25,7 +25,6 @@ public class PaymentRequestValidator implements Validator<PaymentRequest> {
     validateNotBlank(input.getPayer().getPhoneNumber(), "payer.phoneNumber");
     validateNotNull(input.getPayee(), "payee");
     validateNotBlank(input.getPayee().getPhoneNumber(), "payee.phoneNumber");
-    validateNotBlank(input.getTransactionId(), "transactionId");
   }
 
   @Override

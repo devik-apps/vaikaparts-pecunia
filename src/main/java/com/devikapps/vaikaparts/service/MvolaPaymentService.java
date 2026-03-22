@@ -17,10 +17,10 @@ import com.devikapps.vaikaparts.event.model.EventProducer;
 import com.devikapps.vaikaparts.event.model.PaymentVerificationRequested;
 import com.devikapps.vaikaparts.event.model.VerificationStatus;
 import com.devikapps.vaikaparts.gateway.PaymentGatewayFactory;
-import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.mapper.MvolaPaymentMapper;
 import com.devikapps.vaikaparts.mapper.PaymentPartyMapper;
 import com.devikapps.vaikaparts.model.MvolaPayment;
+import com.devikapps.vaikaparts.model.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.model.Payment;
 import com.devikapps.vaikaparts.model.PaymentParty;
 import com.devikapps.vaikaparts.model.PaymentRequest;
@@ -113,14 +113,7 @@ public class MvolaPaymentService implements PaymentService {
         "MVola initiatePayment. PaymentVerificationRequested event created with id={}",
         paymentVerificationRequested.getId());
 
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void afterCommit() {
-            eventProducer.accept(List.of(paymentVerificationRequested));
-          }
-        });
-
+    request.setTransactionId(randomUUID().toString());
     var response = (MvolaPaymentResponse) gatewayFactory.getGateway(MVOLA).initiatePayment(request);
 
     log.info(
@@ -133,6 +126,14 @@ public class MvolaPaymentService implements PaymentService {
     response.setTransactionId(response.getServerCorrelationId());
 
     paymentRepository.save(payment);
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            eventProducer.accept(List.of(paymentVerificationRequested));
+          }
+        });
 
     return mvolaPaymentMapper.toModel(payment);
   }

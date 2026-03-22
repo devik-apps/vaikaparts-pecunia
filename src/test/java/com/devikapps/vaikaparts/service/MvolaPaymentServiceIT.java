@@ -4,6 +4,7 @@ import static com.devikapps.vaikaparts.conf.EnvConf.MVOLA_MSISDN;
 import static com.devikapps.vaikaparts.model.classifier.Country.MADAGASCAR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
+import static java.lang.String.format;
 import static java.util.UUID.randomUUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.devikapps.vaikaparts.conf.FacadeIT;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
 import com.devikapps.vaikaparts.event.model.VerificationStatus;
-import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentRequest;
 import com.devikapps.vaikaparts.model.MvolaPayment;
+import com.devikapps.vaikaparts.model.MvolaPaymentRequest;
 import com.devikapps.vaikaparts.model.PaymentParty;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;
 import com.devikapps.vaikaparts.repository.PaymentPartyRepository;
@@ -66,7 +67,9 @@ class MvolaPaymentServiceIT extends FacadeIT {
             .orElseThrow(
                 () ->
                     new AssertionError(
-                        "Payment not found for transactionId=" + response.getTransactionId()));
+                        format(
+                            "Payment not found for transactionId=%s",
+                            response.getTransactionId())));
 
     assertEquals(MVOLA, saved.getProvider());
     assertEquals(AR, saved.getCurrency());
@@ -88,7 +91,9 @@ class MvolaPaymentServiceIT extends FacadeIT {
             .orElseThrow(
                 () ->
                     new AssertionError(
-                        "Payment not found for transactionId=" + response.getTransactionId()));
+                        format(
+                            "Payment not found for transactionId=%s",
+                            response.getTransactionId())));
 
     assertEquals(response.getTransactionId(), saved.getTransactionId());
   }
@@ -311,7 +316,6 @@ class MvolaPaymentServiceIT extends FacadeIT {
 
   private MvolaPaymentRequest buildValidRequest() {
     return MvolaPaymentRequest.builder()
-        .transactionId(randomUUID().toString())
         .amount(new BigDecimal("100"))
         .currency(AR)
         .description("Integration test payment")
@@ -331,16 +335,15 @@ class MvolaPaymentServiceIT extends FacadeIT {
                 .phoneNumber(MVOLA_MSISDN)
                 .country(MADAGASCAR)
                 .build())
-        .correlationId(randomUUID().toString())
         .build();
   }
 
   private MvolaCallBackRequest buildCallbackRequest(
       final String serverCorrelationId, final String status, final String transactionReference) {
-    final MvolaCallBackRequest request = new MvolaCallBackRequest();
-    request.setServerCorrelationId(serverCorrelationId);
-    request.setTransactionStatus(status);
-    request.setTransactionReference(transactionReference);
-    return request;
+    return MvolaCallBackRequest.builder()
+        .serverCorrelationId(serverCorrelationId)
+        .transactionStatus(status)
+        .transactionReference(transactionReference)
+        .build();
   }
 }

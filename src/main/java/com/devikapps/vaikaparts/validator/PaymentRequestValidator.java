@@ -4,7 +4,6 @@ import static java.lang.String.format;
 
 import com.devikapps.vaikaparts.exception.PaymentValidationException;
 import com.devikapps.vaikaparts.model.PaymentRequest;
-import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
@@ -14,7 +13,9 @@ import org.springframework.validation.annotation.Validated;
 public class PaymentRequestValidator implements Validator<PaymentRequest> {
 
   @Override
-  public void validate(@NotNull final PaymentRequest input) {
+  public void validate(final PaymentRequest input) {
+    if (input == null) throw new PaymentValidationException("PaymentRequest cannot be null");
+
     validateNotNull(input.getAmount(), "amount");
     validatePositiveAmount(input.getAmount());
     validateNotNull(input.getCurrency(), "currency");

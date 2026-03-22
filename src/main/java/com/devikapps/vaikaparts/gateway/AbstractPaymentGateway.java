@@ -15,17 +15,17 @@ public abstract class AbstractPaymentGateway implements PaymentGateway {
   private final PaymentRequestValidator validator;
 
   @Override
-  public final PaymentResponse initiatePayment(final PaymentRequest request) {
+  public final PaymentResponse initiatePayment(PaymentRequest request) {
     validator.validate(request);
     log.info(
         "Initiating payment via provider '{}' with transactionId '{}'",
         getProvider(),
-        request.getTransactionId());
+        forJava(request.getTransactionId()));
     return doInitiatePayment(request);
   }
 
   @Override
-  public final PaymentResponse getPaymentStatus(final String transactionId) {
+  public final PaymentResponse getPaymentStatus(String transactionId) {
     validator.validateNotBlank(transactionId, "transactionId");
     log.info(
         "Fetching payment status via provider '{}' for transactionId '{}'",
@@ -35,7 +35,7 @@ public abstract class AbstractPaymentGateway implements PaymentGateway {
   }
 
   @Override
-  public final PaymentResponse getPaymentDetails(final String transactionId) {
+  public final PaymentResponse getPaymentDetails(String transactionId) {
     validator.validateNotBlank(transactionId, "transactionId");
     log.info(
         "Fetching payment details via provider '{}' for transactionId '{}'",

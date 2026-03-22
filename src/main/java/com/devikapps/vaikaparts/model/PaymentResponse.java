@@ -10,12 +10,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
 @ToString
+@SuperBuilder
 public abstract class PaymentResponse {
   private String transactionId;
   private PaymentStatus status;

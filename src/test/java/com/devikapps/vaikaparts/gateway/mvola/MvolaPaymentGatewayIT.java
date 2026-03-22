@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.devikapps.vaikaparts.conf.FacadeIT;
 import com.devikapps.vaikaparts.config.MvolaConf;
+import com.devikapps.vaikaparts.model.MvolaPaymentRequest;
+import com.devikapps.vaikaparts.model.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.model.PaymentParty;
 import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;

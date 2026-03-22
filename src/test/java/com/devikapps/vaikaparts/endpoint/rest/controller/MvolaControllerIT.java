@@ -5,7 +5,6 @@ import static com.devikapps.vaikaparts.event.model.VerificationStatus.PENDING;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
 import static java.lang.String.format;
-import static java.util.UUID.randomUUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -18,8 +17,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.devikapps.vaikaparts.conf.FacadeIT;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
+import com.devikapps.vaikaparts.endpoint.rest.controller.model.RMvolaPaymentRequest;
 import com.devikapps.vaikaparts.event.model.VerificationStatus;
-import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentRequest;
+import com.devikapps.vaikaparts.mapper.PaymentRequestMapper;
 import com.devikapps.vaikaparts.model.MvolaPayment;
 import com.devikapps.vaikaparts.model.PaymentParty;
 import com.devikapps.vaikaparts.model.classifier.Country;
@@ -30,7 +30,6 @@ import com.devikapps.vaikaparts.repository.PaymentRequestedRepository;
 import com.devikapps.vaikaparts.repository.model.JPayment;
 import com.devikapps.vaikaparts.service.MvolaPaymentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +49,7 @@ class MvolaControllerIT extends FacadeIT {
   @Autowired private PaymentRepository paymentRepository;
   @Autowired private PaymentRequestedRepository paymentRequestedRepository;
   @Autowired private PaymentPartyRepository paymentPartyRepository;
+  @Autowired private PaymentRequestMapper paymentRequestMapper;
 
   @AfterEach
   void clean_up() {
@@ -101,21 +101,8 @@ class MvolaControllerIT extends FacadeIT {
 
   @Test
   void should_return_400_when_payer_is_null() throws Exception {
-    final MvolaPaymentRequest request = buildValidRequest();
+    final var request = buildValidRequest();
     request.setPayer(null);
-
-    mockMvc
-        .perform(
-            post(BASE_URL)
-                .contentType(APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void should_return_400_when_amount_is_null() throws Exception {
-    final MvolaPaymentRequest request = buildValidRequest();
-    request.setAmount(null);
 
     mockMvc
         .perform(
@@ -129,7 +116,9 @@ class MvolaControllerIT extends FacadeIT {
   @Transactional
   void should_return_200_with_correct_payment_body_on_get_payment() throws Exception {
     final MvolaPayment initiated =
-        (MvolaPayment) mvolaPaymentService.initiatePayment(buildValidRequest());
+        (MvolaPayment)
+            mvolaPaymentService.initiatePayment(
+                paymentRequestMapper.toMvolaPaymentRequest(buildValidRequest()));
     Thread.sleep(CONSUMER_WAIT_MS);
 
     mockMvc
@@ -151,7 +140,9 @@ class MvolaControllerIT extends FacadeIT {
   @Test
   void should_return_200_on_valid_completed_callback() throws Exception {
     final MvolaPayment initiated =
-        (MvolaPayment) mvolaPaymentService.initiatePayment(buildValidRequest());
+        (MvolaPayment)
+            mvolaPaymentService.initiatePayment(
+                paymentRequestMapper.toMvolaPaymentRequest(buildValidRequest()));
     Thread.sleep(CONSUMER_WAIT_MS);
 
     mockMvc
@@ -169,7 +160,9 @@ class MvolaControllerIT extends FacadeIT {
   @Test
   void should_update_payment_status_to_success_after_completed_callback() throws Exception {
     final MvolaPayment initiated =
-        (MvolaPayment) mvolaPaymentService.initiatePayment(buildValidRequest());
+        (MvolaPayment)
+            mvolaPaymentService.initiatePayment(
+                paymentRequestMapper.toMvolaPaymentRequest(buildValidRequest()));
     Thread.sleep(CONSUMER_WAIT_MS);
 
     mockMvc
@@ -193,7 +186,9 @@ class MvolaControllerIT extends FacadeIT {
   @Test
   void should_update_payment_status_to_failed_after_failed_callback() throws Exception {
     final MvolaPayment initiated =
-        (MvolaPayment) mvolaPaymentService.initiatePayment(buildValidRequest());
+        (MvolaPayment)
+            mvolaPaymentService.initiatePayment(
+                paymentRequestMapper.toMvolaPaymentRequest(buildValidRequest()));
     Thread.sleep(CONSUMER_WAIT_MS);
 
     mockMvc
@@ -234,13 +229,11 @@ class MvolaControllerIT extends FacadeIT {
         .andExpect(status().isNotFound());
   }
 
-  private MvolaPaymentRequest buildValidRequest() {
-    return MvolaPaymentRequest.builder()
-        .transactionId(randomUUID().toString())
-        .amount(new BigDecimal("100"))
+  private RMvolaPaymentRequest buildValidRequest() {
+    return RMvolaPaymentRequest.builder()
+        .amount(100)
         .currency(AR)
         .description("Integration test payment")
-        .provider(MVOLA)
         .type(PaymentType.PROFILE_UNLOCK)
         .payer(
             PaymentParty.builder()
@@ -259,15 +252,13 @@ class MvolaControllerIT extends FacadeIT {
 
   private MvolaCallBackRequest buildCallbackRequest(
       final String serverCorrelationId, final String status, final String transactionReference) {
-    final MvolaCallBackRequest request = new MvolaCallBackRequest();
-    request.setServerCorrelationId(serverCorrelationId);
-    request.setTransactionStatus(status);
-    request.setTransactionReference(transactionReference);
-    request.setRequestDate("2026-03-22T03:28:00.567Z");
-    request.setDebitParty(
-        List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", CUSTOMER_MSISDN)));
-    request.setCreditParty(
-        List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", MVOLA_MSISDN)));
-    return request;
+    return MvolaCallBackRequest.builder()
+        .serverCorrelationId(serverCorrelationId)
+        .transactionStatus(status)
+        .transactionReference(transactionReference)
+        .requestDate("2026-03-22T03:28:00.567Z")
+        .debitParty(List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", CUSTOMER_MSISDN)))
+        .creditParty(List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", MVOLA_MSISDN)))
+        .build();
   }
 }

@@ -9,6 +9,8 @@ import static org.owasp.encoder.Encode.forJava;
 import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
 import com.devikapps.vaikaparts.gateway.AbstractPaymentGateway;
+import com.devikapps.vaikaparts.model.MvolaPaymentRequest;
+import com.devikapps.vaikaparts.model.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.model.PaymentRequest;
 import com.devikapps.vaikaparts.model.PaymentResponse;
 import com.devikapps.vaikaparts.model.classifier.PaymentProvider;

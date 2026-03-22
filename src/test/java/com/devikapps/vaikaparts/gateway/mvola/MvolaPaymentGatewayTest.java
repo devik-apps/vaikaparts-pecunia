@@ -18,6 +18,8 @@ import com.devikapps.vaikaparts.client.MvolaApiTestBase;
 import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
 import com.devikapps.vaikaparts.exception.PaymentValidationException;
+import com.devikapps.vaikaparts.model.MvolaPaymentRequest;
+import com.devikapps.vaikaparts.model.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.model.PaymentParty;
 import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.devikapps.vaikaparts.model.classifier.PaymentType;

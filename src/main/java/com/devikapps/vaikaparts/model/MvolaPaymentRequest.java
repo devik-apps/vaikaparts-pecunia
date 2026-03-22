@@ -1,8 +1,7 @@
-package com.devikapps.vaikaparts.gateway.mvola;
+package com.devikapps.vaikaparts.model;
 
 import static java.lang.String.format;
 
-import com.devikapps.vaikaparts.model.PaymentRequest;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

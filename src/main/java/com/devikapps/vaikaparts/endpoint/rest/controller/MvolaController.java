@@ -3,7 +3,8 @@ package com.devikapps.vaikaparts.endpoint.rest.controller;
 import static org.owasp.encoder.Encode.forJava;
 
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
-import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentRequest;
+import com.devikapps.vaikaparts.endpoint.rest.controller.model.RMvolaPaymentRequest;
+import com.devikapps.vaikaparts.mapper.PaymentRequestMapper;
 import com.devikapps.vaikaparts.model.MvolaPayment;
 import com.devikapps.vaikaparts.service.MvolaPaymentService;
 import jakarta.validation.Valid;
@@ -31,13 +32,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class MvolaController {
 
   private final MvolaPaymentService mvolaPaymentService;
+  private final PaymentRequestMapper paymentRequestMapper;
 
   @PostMapping
   public ResponseEntity<MvolaPayment> initiatePayment(
-      @Valid @NotNull @RequestBody MvolaPaymentRequest request) {
+      @Valid @NotNull @RequestBody RMvolaPaymentRequest request) {
     log.info("MVola Payment initiation at POST /v1/payments/mvola");
+
+    var mvolaPaymentReq = paymentRequestMapper.toMvolaPaymentRequest(request);
+
     return new ResponseEntity<>(
-        (MvolaPayment) mvolaPaymentService.initiatePayment(request), HttpStatus.CREATED);
+        (MvolaPayment) mvolaPaymentService.initiatePayment(mvolaPaymentReq), HttpStatus.CREATED);
   }
 
   @GetMapping("/customer/{customer-msisdn}")

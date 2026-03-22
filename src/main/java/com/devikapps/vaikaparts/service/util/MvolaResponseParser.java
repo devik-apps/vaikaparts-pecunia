@@ -3,7 +3,7 @@ package com.devikapps.vaikaparts.service.util;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
 
-import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentResponse;
+import com.devikapps.vaikaparts.model.MvolaPaymentResponse;
 import com.devikapps.vaikaparts.model.classifier.PaymentStatus;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;

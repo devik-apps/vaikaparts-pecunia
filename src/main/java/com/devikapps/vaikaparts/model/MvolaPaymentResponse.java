@@ -1,6 +1,5 @@
-package com.devikapps.vaikaparts.gateway.mvola;
+package com.devikapps.vaikaparts.model;
 
-import com.devikapps.vaikaparts.model.PaymentResponse;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

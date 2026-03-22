@@ -1,14 +1,23 @@
 openapi: 3.1.0
 info:
-  title: Title
-  description: Title
+  title: VaikaParts Payment Backend
+  description: >
+    Payment backend for the VaikaParts application. This service is responsible for handling all payment operations within the VaikaParts platform, including merchant pay transactions via MVola, Orange Money, and Airtel Money. It operates independently from the VaikaParts domain backend, which handles the core business logic of the application.
+
   version: 1.0.0
+  contact:
+    name: Devik'Apps Development Team
+    email: vaikaparts@gmail.com
+    url: https://devikapps.com
 servers:
-  - url: https
+  - url: https://xxxxxxx.com
+    description: Pre-production environment
+  - url: http://localhost:9090
+    description: Local development environment
 paths:
   /:
     get:
-      operationId: rootRedirect
+      operationId: addViewControllers
       tags:
         - Docs
       summary: Redirect root path to Swagger UI
@@ -20,10 +29,14 @@ paths:
               description: URL to redirect
               schema:
                 type: string
-                example: /doc
+                format: uri
+        400:
+          $ref: '#/components/responses/BadRequest'
+        500:
+          $ref: '#/components/responses/InternalServer'
   /ping:
     get:
-      operationId: pong
+      operationId: ping
       tags:
         - Health
       summary: Check if the server is alive
@@ -31,13 +44,18 @@ paths:
         200:
           description: A message showing that the server is alive
           content:
-            application/json:
+            text/plain:
               schema:
                 type: string
+                format: string
                 example: pong
+        400:
+          $ref: '#/components/responses/BadRequest'
+        500:
+          $ref: '#/components/responses/InternalServer'
   /health/email:
     get:
-      operationId: sendHealthEmail
+      operationId: sendHealthCheckEmails
       tags:
         - Health
       summary: Send health check email
@@ -52,35 +70,27 @@ paths:
             type: string
             format: email
       responses:
-        '200':
+        200:
           description: Email sent successfully
           content:
-            application/json:
+            text/plain:
               schema:
                 type: string
-                example: Email sent successfully
-        '400':
-          description: Invalid email address format
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                timestamp: '2025-11-04T10:30:00Z'
-                status: 400
-                error: Bad Request
-                message: Invalid email address format
-                path: /health/email
-                errorCode: BAD_FORM
+                format: string
+                example: "Email sent successfully"
+        400:
+          $ref: '#/components/responses/BadRequest'
+        500:
+          $ref: '#/components/responses/InternalServer'
   /health/message:
     get:
       operationId: triggerDummyEvents
       tags:
         - Health
       summary: Trigger dummy health check events
-      description: 'This endpoint triggers one or more dummy events through the event producer  for testing the messaging system (e.g., RabbitMQ or Kafka).
+      description: >
+        This endpoint triggers one or more dummy events through the event producer  for testing the messaging system (e.g., RabbitMQ or Kafka).
 
-'
       parameters:
         - name: nbEvent
           in: query
@@ -107,22 +117,14 @@ paths:
               schema:
                 type: array
                 items:
-                  type: string
-                example:
-                  - c91f2c9b-9c8e-4e7f-84e2-09c95edff3e4
-                  - 51af4d2b-745a-465d-b9a2-bf0b1c1ffb23
+                  $ref: '#/components/schemas/UUID'
         400:
-          description: Invalid parameter values (e.g., nbEvent not in 1–500)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: nbEvent must be between 1 and 500
+          $ref: '#/components/responses/NotFound'
+        500:
+          $ref: '#/components/responses/InternalServer'
   /health/db:
     get:
+      operationId: checkDbHealth
       summary: Health check for the dummy database
       description: Returns a paginated list of Dummy entities.
       tags:
@@ -141,83 +143,142 @@ paths:
             default: 10
           description: Page size
       responses:
-        '200':
+        200:
           description: Successful database health check
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  content:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Dummy'
-                  totalElements:
-                    type: integer
-                  totalPages:
-                    type: integer
-                  number:
-                    type: integer
-                  size:
-                    type: integer
-                example:
-                  content:
-                    - id: 550e8400-e29b-41d4-a716-446655440000
-                      description: First dummy description
-                  totalElements: 5
-                  totalPages: 1
-                  number: 0
-                  size: 5
+                $ref: "#/components/schemas/DummyPageResponse"
+        400:
+          $ref: '#/components/responses/BadRequest'
+        500:
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/mvola:
+    post:
+      tags:
+        - MVola
+      summary: Initiate a payment
+      description: Initiates a new MVola merchant pay transaction. The payment is created with a PENDING status. The caller must poll GET /{transactionId} or wait for the callback to know the final status.
+      operationId: initiatePayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MvolaPaymentRequest'
+      responses:
+        '201':
+          description: Payment successfully initiated. Status is always PENDING at this stage.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MvolaPayment'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/mvola/{customer-msisdn}:
+    get:
+      tags:
+        - MVola
+      summary: Get all Mvola payment by to a customer MSISDN.
+      operationId: getPaymentsByCustomerMsisdn
+      description: Retrieves all existing mvola payment transaction done by a given Customer MSISDN with possibility to retrieve with a given page and size.
+      parameters:
+        - name: customer-msisdn
+          in: path
+          required: true
+          description: The customer msisdn with what the Mvola payment was done.
+          schema:
+            $ref: '#/components/schemas/PhoneNumber'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+          description: Page number (0-based)
+        - in: query
+          name: size
+          schema:
+            type: integer
+            default: 10
+          description: Page size
+      responses:
+        200:
+          description: List of pagined Mvola payment done by the Customer with given MSISDN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MvolaPaymentPageResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/mvola/{transactionId}:
+    get:
+      tags:
+        - MVola
+      summary: Get a payment by transaction ID
+      description: Retrieves an existing MVola payment by its transaction ID. The transaction ID is the serverCorrelationId returned by the initiate endpoint.
+      operationId: getPayment
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          description: The transaction ID of the payment to retrieve. This is the serverCorrelationId returned by the initiate endpoint.
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Payment found and returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MvolaPayment'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/mvola/callback:
+    put:
+      tags:
+        - MVola
+      summary: Receive MVola payment callback
+      description: >
+        Endpoint invoked by MVola via PUT when a transaction reaches a terminal status (completed or failed). This endpoint is not called by the client — it is called by MVola's infrastructure only. On success, returns HTTP 200 with no body.
+
+      operationId: handleCallBack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MvolaCallBackRequest'
+      responses:
+        '200':
+          description: Callback received and processed successfully. No response body.
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
 components:
   schemas:
-    ErrorResponse:
-      type: object
-      properties:
-        timestamp:
-          $ref: '#/components/schemas/DateTime'
-          description: When the error occurred
-        status:
-          type: integer
-          description: HTTP status code
-          example: 400
-        error:
-          type: string
-          description: HTTP status reason phrase
-          example: Bad Request
-        message:
-          type: string
-          description: Detailed error message
-          example: Validation failed
-        path:
-          type: string
-          description: Request path where error occurred
-          example: /path/of/the/endpoint
-        errorCode:
-          type: string
-          description: Application-specific error code
-          enum:
-            - AUTHORIZATION_DENIED
-            - ENTITY_NOT_FOUND
-            - CONSTRAINT_VIOLATION_ON_FIELDS
-            - TOKEN_UNIQUENESS_CONFLICT
-            - BAD_FORM
-            - MISSING_AUTHORIZATION
-            - INVALID_AUTHORIZATION_FORMAT
-            - INVALID_TOKEN
-            - TOKEN_NOT_FOUND
-            - USER_DEACTIVATED
-            - AUTHENTICATION_FAILED
-            - INTERNAL_SERVER_ERROR
-            - MISSING_REQUIRED_PARAMETER
-            - INVALID_PARAMETER
-            - MALFORMED_JSON
-            - METHOD_NOT_ALLOWED
-      required:
-        - timestamp
-        - status
-        - error
-        - message
-        - path
     DateTime:
       type: string
       format: date-time
@@ -228,6 +289,11 @@ components:
       pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
       format: uuid
       example: e6b5cc3e-eaaa-4cb3-912c-e059e983bb78
+    PhoneNumber:
+      type: string
+      pattern: '^\\+?[1-9]\\d{1,14}$'
+      description: "E.164 phone number format"
+      example: +261340000003
     Dummy:
       type: object
       required:
@@ -238,3 +304,356 @@ components:
           $ref: '#/components/schemas/UUID'
         description:
           type: string
+    PageResponse:
+      type: object
+      required: [content, pageable, total_elements, total_pages, last, first, size, number, number_of_elements, empty]
+      description: >
+        Paginated response wrapper matching the JSON serialization of org.springframework.data.domain.Page. The pagination metadata is nested under the `pageable` object, consistent with Spring Data defaults.
+
+      properties:
+        content:
+          type: array
+          description: Page content — the list of elements for the current page.
+          items: {}
+        pageable:
+          type: object
+          description: Pagination state used to produce this page.
+          properties:
+            page_number:
+              type: integer
+              description: Zero-based current page index.
+            page_size:
+              type: integer
+              description: Requested number of items per page.
+            offset:
+              type: integer
+              format: int64
+              description: Offset of the first element of this page relative to the full result set.
+            sort:
+              $ref: '#/components/schemas/SortDescriptor'
+            paged:
+              type: boolean
+              description: Whether pagination is applied.
+            unpaged:
+              type: boolean
+              description: Whether pagination is disabled.
+        total_elements:
+          type: integer
+          format: int64
+          description: Total number of elements across all pages.
+        total_pages:
+          type: integer
+          description: Total number of pages available.
+        last:
+          type: boolean
+          description: Whether this is the last page.
+        first:
+          type: boolean
+          description: Whether this is the first page.
+        size:
+          type: integer
+          description: Effective page size (number of elements requested per page).
+        number:
+          type: integer
+          description: Zero-based index of the current page.
+        number_of_elements:
+          type: integer
+          description: Number of elements on the current page.
+        empty:
+          type: boolean
+          description: Whether the current page has no content.
+        sort:
+          $ref: '#/components/schemas/SortDescriptor'
+    SortDescriptor:
+      type: object
+      description: Sort state descriptor returned by Spring Data.
+      properties:
+        empty:
+          type: boolean
+          description: Whether no sort orders are applied.
+        sorted:
+          type: boolean
+          description: Whether at least one sort order is applied.
+        unsorted:
+          type: boolean
+          description: Whether no sort orders are applied (inverse of sorted).
+    DummyPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/Dummy'
+    MvolaPaymentPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/MvolaPayment'
+    BasePayment:
+      type: object
+      description: Base payment domain model shared across all payment providers.
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        transaction_id:
+          type: string
+          example: "b7c3d4e5-f6a7-8901-bcde-f12345678901"
+        description:
+          type: string
+          example: "Profile unlock payment"
+        payer:
+          $ref: '#/components/schemas/PaymentParty'
+        payee:
+          $ref: '#/components/schemas/PaymentParty'
+        provider:
+          $ref: '#/components/schemas/PaymentProvider'
+        type:
+          $ref: '#/components/schemas/PaymentType'
+        amount:
+          type: number
+          format: decimal
+          example: 5000
+        currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        status:
+          $ref: '#/components/schemas/VerificationStatus'
+        created_at:
+          $ref: '#/components/schemas/DateTime'
+        updated_at:
+          $ref: '#/components/schemas/DateTime'
+    MvolaNotificationMethod:
+      type: string
+      enum: ['polling', 'callback']
+      example: 'polling'
+    MvolaPayment:
+      type: obeject
+      allOf:
+        - $ref: '#/components/schemas/BasePayment'
+      properties:
+        server_correlation_id:
+          $ref: '#/components/schemas/UUID'
+        mvola_transaction_id:
+          type: string
+          example: "b7c3d4e5-f6a7-8901-bcde-f12345678901"
+        notification_method:
+          $ref: '#/components/schemas/MvolaNotificationMethod'
+    BasePaymentRequest:
+      type: object
+      description: Base payment request shared across all payment providers.
+      required:
+        - amount
+        - payer
+        - payee
+      properties:
+        transaction_id:
+          type: string
+          example: "b7c3d4e5-f6a7-8901-bcde-f12345678901"
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          example: 5000
+        currency:
+          $ref: '#/components/schemas/PaymentCurrency'
+        description:
+          type: string
+          example: "Profile unlock payment"
+        payer:
+          $ref: '#/components/schemas/PaymentParty'
+        payee:
+          $ref: '#/components/schemas/PaymentParty'
+        provider:
+          $ref: '#/components/schemas/PaymentProvider'
+        type:
+          $ref: '#/components/schemas/PaymentType'
+    MvolaPaymentRequest:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/BasePaymentRequest'
+      properties:
+        correlation_id:
+          $ref: '#/components/schemas/UUID'
+        callback_url:
+          type: string
+          format: uri
+          description: This is the callback url used by Mvola to fetch payment status.
+    MvolaCallBackRequest:
+      type: object
+      description: Callback payload sent by MVola via PUT when a transaction completes or fails.
+      properties:
+        transactionStatus:
+          type: string
+          enum:
+            - completed
+            - failed
+          example: "completed"
+        serverCorrelationId:
+          type: string
+          format: uuid
+          example: "421a22a2-ef1d-42bc-9452-f4939a3d5cdf"
+        transactionReference:
+          type: string
+          example: "641235"
+        requestDate:
+          type: string
+          format: date-time
+          example: "2021-02-24T03:28:00.567Z"
+        debitParty:
+          type: array
+          items:
+            $ref: '#/components/schemas/MvolaPartyEntry'
+        creditParty:
+          type: array
+          items:
+            $ref: '#/components/schemas/MvolaPartyEntry'
+        fees:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/MvolaFeeEntry'
+        metadata:
+          type: array
+          items:
+            $ref: '#/components/schemas/MvolaPartyEntry'
+    MvolaPartyEntry:
+      type: object
+      description: Generic key-value entry used for debitParty, creditParty, and metadata in MVola payloads.
+      properties:
+        key:
+          type: string
+          example: "msisdn"
+        value:
+          type: string
+          example: "0343500003"
+    MvolaFeeEntry:
+      type: object
+      description: Fee entry returned in successful MVola callback payloads.
+      properties:
+        feeAmount:
+          type: string
+          example: "5.46"
+    PaymentParty:
+      type: object
+      properties:
+        phone_number:
+          $ref: '#/components/schemas/PhoneNumber'
+        name:
+          type: string
+          example: "Test Customer"
+        country:
+          type: string
+          example: "MADAGASCAR"
+    PaymentProvider:
+      type: string
+      enum:
+        - MVOLA
+        - ORANGE_MONEY
+        - AIRTEL_MONEY
+      example: "MVOLA"
+    PaymentType:
+      type: string
+      enum:
+        - PROFILE_UNLOCK
+      example: "PROFILE_UNLOCK"
+    PaymentCurrency:
+      type: string
+      enum:
+        - AR
+      example: "AR"
+    VerificationStatus:
+      type: string
+      enum:
+        - PENDING
+        - SUCCESS
+        - FAILED
+      example: "PENDING"
+    ErrorResponse:
+      type: object
+      required: [timestamp, status, error, message, path]
+      description: Standard error response format
+      properties:
+        timestamp:
+          $ref: '#/components/schemas/DateTime'
+        status:
+          type: integer
+          description: HTTP status code
+        error:
+          type: string
+          description: HTTP status reason phrase
+        message:
+          type: string
+          description: Human-readable error description
+        path:
+          type: string
+          description: The relative URI of the request that caused the error.
+          example: "/api/v1/resource-path"
+        error_code:
+          type: string
+          description: Application-specific error code
+          enum:
+            - RESOURCE_NOT_FOUND
+            - ILLEGAL_STATE
+            - SECURITY_EXCEPTION
+            - PAYLOAD_NOT_AS_EXPECTED
+            - EMAIL_HEALTH_CHECK_FAILED
+            - MISSING_REQUIRED_PART
+            - DUPLICATE_EMAIL
+            - DUPLICATE_SUPABASE_ID
+            - DIRECTORY_UPLOAD_FAILED
+            - AUTHORIZATION_DENIED
+            - ENTITY_NOT_FOUND
+            - MISSING_REQUEST_HEADER
+            - MISSING_AUTH_CREDS
+            - BAD_FORM
+            - MISSING_AUTHORIZATION
+            - INTERNAL_SERVER_ERROR
+            - MISSING_REQUIRED_PARAMETER
+            - INVALID_PARAMETER
+            - MALFORMED_JSON
+            - METHOD_NOT_ALLOWED
+        details:
+          type: object
+          description: Additional error context
+  responses:
+    InternalServer:
+      description: Internal Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Invalid request parameters or payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid authentication credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Insufficient permissions for requested operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Requested resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Resource conflict or duplicate entity
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

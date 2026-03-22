@@ -5,16 +5,20 @@ import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
 import static java.util.UUID.randomUUID;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.devikapps.vaikaparts.conf.FacadeIT;
+import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
 import com.devikapps.vaikaparts.event.model.VerificationStatus;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
 import com.devikapps.vaikaparts.gateway.mvola.MvolaPaymentRequest;
@@ -26,6 +30,7 @@ import com.devikapps.vaikaparts.service.MvolaPaymentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -36,9 +41,11 @@ class MvolaControllerIT extends FacadeIT {
   private static final String BASE_URL = "/v1/payments/mvola";
   private static final String TRANSACTION_ID = randomUUID().toString();
   private static final String CORRELATION_ID = randomUUID().toString();
+  private static final String CUSTOMER_MSISDN = "0343500003";
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
+
   @MockitoBean private MvolaPaymentService mvolaPaymentService;
 
   @Test
@@ -82,7 +89,7 @@ class MvolaControllerIT extends FacadeIT {
 
   @Test
   void should_return_400_when_payer_is_null() throws Exception {
-    MvolaPaymentRequest request = buildValidRequest();
+    final MvolaPaymentRequest request = buildValidRequest();
     request.setPayer(null);
 
     mockMvc
@@ -110,6 +117,7 @@ class MvolaControllerIT extends FacadeIT {
   void should_propagate_gateway_exception_as_5xx_on_initiate_payment() throws Exception {
     when(mvolaPaymentService.initiatePayment(any(MvolaPaymentRequest.class)))
         .thenThrow(new PaymentGatewayException("MVola gateway error"));
+
     mockMvc
         .perform(
             post(BASE_URL)
@@ -150,6 +158,64 @@ class MvolaControllerIT extends FacadeIT {
         .andExpect(status().isNotFound());
   }
 
+  @Test
+  void should_return_200_on_valid_completed_callback() throws Exception {
+    doNothing().when(mvolaPaymentService).handleCallBack(any(MvolaCallBackRequest.class));
+
+    mockMvc
+        .perform(
+            put(BASE_URL + "/callback")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(buildCompletedCallbackRequest())))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void should_return_200_on_valid_failed_callback() throws Exception {
+    doNothing().when(mvolaPaymentService).handleCallBack(any(MvolaCallBackRequest.class));
+
+    mockMvc
+        .perform(
+            put(BASE_URL + "/callback")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(buildFailedCallbackRequest())))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void should_delegate_to_service_exactly_once_on_callback() throws Exception {
+    doNothing().when(mvolaPaymentService).handleCallBack(any(MvolaCallBackRequest.class));
+
+    mockMvc
+        .perform(
+            put(BASE_URL + "/callback")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(buildCompletedCallbackRequest())))
+        .andExpect(status().isOk());
+
+    verify(mvolaPaymentService, times(1)).handleCallBack(any(MvolaCallBackRequest.class));
+  }
+
+  @Test
+  void should_return_400_when_callback_body_is_absent() throws Exception {
+    mockMvc
+        .perform(put(BASE_URL + "/callback").contentType(APPLICATION_JSON))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void should_return_empty_body_on_successful_callback() throws Exception {
+    doNothing().when(mvolaPaymentService).handleCallBack(any(MvolaCallBackRequest.class));
+
+    mockMvc
+        .perform(
+            put(BASE_URL + "/callback")
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(buildCompletedCallbackRequest())))
+        .andExpect(status().isOk())
+        .andExpect(content().string(""));
+  }
+
   private MvolaPaymentRequest buildValidRequest() {
     return MvolaPaymentRequest.builder()
         .transactionId(randomUUID().toString())
@@ -183,5 +249,32 @@ class MvolaControllerIT extends FacadeIT {
         .amount(new BigDecimal("100"))
         .currency(AR)
         .build();
+  }
+
+  private MvolaCallBackRequest buildCompletedCallbackRequest() {
+    final MvolaCallBackRequest request = new MvolaCallBackRequest();
+    request.setServerCorrelationId(CORRELATION_ID);
+    request.setTransactionStatus("completed");
+    request.setTransactionReference("641235");
+    request.setRequestDate("2021-02-24T03:28:00.567Z");
+    request.setDebitParty(
+        List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", CUSTOMER_MSISDN)));
+    request.setCreditParty(
+        List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", MVOLA_MSISDN)));
+    request.setFees(List.of(new MvolaCallBackRequest.MvolaFeeEntry("5.46")));
+    return request;
+  }
+
+  private MvolaCallBackRequest buildFailedCallbackRequest() {
+    final MvolaCallBackRequest request = new MvolaCallBackRequest();
+    request.setServerCorrelationId(CORRELATION_ID);
+    request.setTransactionStatus("failed");
+    request.setTransactionReference("641235");
+    request.setRequestDate("2021-02-24T03:28:00.567Z");
+    request.setDebitParty(
+        List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", CUSTOMER_MSISDN)));
+    request.setCreditParty(
+        List.of(new MvolaCallBackRequest.MvolaPartyEntry("msisdn", MVOLA_MSISDN)));
+    return request;
   }
 }

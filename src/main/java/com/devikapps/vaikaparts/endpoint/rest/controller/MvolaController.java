@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -36,6 +38,15 @@ public class MvolaController {
     log.info("MVola Payment initiation at POST /v1/payments/mvola");
     return new ResponseEntity<>(
         (MvolaPayment) mvolaPaymentService.initiatePayment(request), HttpStatus.CREATED);
+  }
+
+  @GetMapping("/{customer-msisdn}")
+  public Page<MvolaPayment> getPaymentsByCustomerMsisdn(
+      @PathVariable(name = "customer-msisdn") @NotNull String customerMsisdn,
+      @RequestParam(name = "page", required = false) Integer page,
+      @RequestParam(name = "size", required = false) Integer size) {
+    log.info("Mvola Payment get by customer msisdn at GET /v1/payments/mvola/{}", customerMsisdn);
+    return mvolaPaymentService.findPaymentsByPaymentPartyMsisdn(customerMsisdn, page, size);
   }
 
   @GetMapping("/{transactionId}")

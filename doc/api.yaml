@@ -450,10 +450,8 @@ components:
         - amount
         - payer
         - payee
+        - type
       properties:
-        transaction_id:
-          type: string
-          example: "b7c3d4e5-f6a7-8901-bcde-f12345678901"
         amount:
           type: number
           format: decimal
@@ -468,21 +466,12 @@ components:
           $ref: '#/components/schemas/PaymentParty'
         payee:
           $ref: '#/components/schemas/PaymentParty'
-        provider:
-          $ref: '#/components/schemas/PaymentProvider'
         type:
           $ref: '#/components/schemas/PaymentType'
     MvolaPaymentRequest:
       type: object
       allOf:
         - $ref: '#/components/schemas/BasePaymentRequest'
-      properties:
-        correlation_id:
-          $ref: '#/components/schemas/UUID'
-        callback_url:
-          type: string
-          format: uri
-          description: This is the callback url used by Mvola to fetch payment status.
     MvolaCallBackRequest:
       type: object
       description: Callback payload sent by MVola via PUT when a transaction completes or fails.

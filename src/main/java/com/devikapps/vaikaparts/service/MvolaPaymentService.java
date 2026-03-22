@@ -211,6 +211,11 @@ public class MvolaPaymentService implements PaymentService {
   private JPaymentParty resolvePaymentParty(final PaymentParty party) {
     return paymentPartyRepository
         .findJPaymentPartyByPhoneNumber(party.getPhoneNumber())
-        .orElseGet(() -> paymentPartyRepository.save(paymentPartyMapper.toPersistence(party)));
+        .orElseGet(
+            () -> {
+              var jParty = paymentPartyMapper.toPersistence(party);
+              jParty.setId(randomUUID().toString());
+              return paymentPartyRepository.save(jParty);
+            });
   }
 }

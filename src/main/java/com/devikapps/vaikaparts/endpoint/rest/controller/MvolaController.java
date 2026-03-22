@@ -40,7 +40,7 @@ public class MvolaController {
         (MvolaPayment) mvolaPaymentService.initiatePayment(request), HttpStatus.CREATED);
   }
 
-  @GetMapping("/{customer-msisdn}")
+  @GetMapping("/customer/{customer-msisdn}")
   public Page<MvolaPayment> getPaymentsByCustomerMsisdn(
       @PathVariable(name = "customer-msisdn") @NotNull String customerMsisdn,
       @RequestParam(name = "page", required = false) Integer page,

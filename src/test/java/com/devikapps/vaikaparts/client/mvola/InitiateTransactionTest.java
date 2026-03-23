@@ -1,4 +1,4 @@
-package com.devikapps.vaikaparts.client;
+package com.devikapps.vaikaparts.client.mvola;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.UUID.randomUUID;

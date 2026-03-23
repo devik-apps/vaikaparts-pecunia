@@ -1,4 +1,4 @@
-package com.devikapps.vaikaparts.client;
+package com.devikapps.vaikaparts.client.mvola;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

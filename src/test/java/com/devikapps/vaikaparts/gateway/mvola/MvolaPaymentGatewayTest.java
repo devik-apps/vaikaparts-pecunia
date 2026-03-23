@@ -14,7 +14,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.devikapps.vaikaparts.client.MvolaApiTestBase;
+import com.devikapps.vaikaparts.client.mvola.MvolaApiTestBase;
 import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
 import com.devikapps.vaikaparts.exception.PaymentValidationException;

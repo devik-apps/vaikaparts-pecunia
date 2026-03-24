@@ -594,7 +594,6 @@ class AirtelMoneyPaymentServiceTest {
         .type(PaymentType.PROFILE_UNLOCK)
         .payer(PaymentParty.builder().phoneNumber(TEST_MSISDN).build())
         .payee(PaymentParty.builder().phoneNumber(SAMPLE_MSISDN).build())
-        .reference("Test reference")
         .build();
   }
 

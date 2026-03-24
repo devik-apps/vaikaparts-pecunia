@@ -241,12 +241,6 @@ class MvolaControllerIT extends FacadeIT {
                 .name("Test Customer")
                 .country(Country.MADAGASCAR)
                 .build())
-        .payee(
-            PaymentParty.builder()
-                .phoneNumber(MVOLA_MSISDN)
-                .name("TestMVola")
-                .country(Country.MADAGASCAR)
-                .build())
         .build();
   }
 

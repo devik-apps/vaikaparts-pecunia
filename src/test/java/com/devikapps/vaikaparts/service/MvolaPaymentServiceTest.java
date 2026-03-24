@@ -1,5 +1,8 @@
 package com.devikapps.vaikaparts.service;
 
+import static com.devikapps.vaikaparts.client.mvola.MvolaApiTestBase.PARTNER_NAME;
+import static com.devikapps.vaikaparts.conf.EnvConf.MVOLA_BASE_URL;
+import static com.devikapps.vaikaparts.conf.EnvConf.MVOLA_BASE_URL_TOKEN;
 import static com.devikapps.vaikaparts.conf.EnvConf.MVOLA_MSISDN;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
@@ -15,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atLeastOnce;
@@ -24,6 +28,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
 import com.devikapps.vaikaparts.event.model.EventProducer;
 import com.devikapps.vaikaparts.event.model.PaymentVerificationRequested;
@@ -87,8 +92,21 @@ class MvolaPaymentServiceTest {
   @BeforeEach
   void set_up() {
     TransactionSynchronizationManager.initSynchronization();
+
+    MvolaConf conf =
+        MvolaConf.builder()
+            .baseUrl(MVOLA_BASE_URL)
+            .callbackUrl("https://example.com/callback")
+            .partnerMsisdn(MVOLA_MSISDN)
+            .partnerName(PARTNER_NAME)
+            .consumerKey(randomUUID().toString())
+            .consumerSecret(randomUUID().toString())
+            .tokenUrl(MVOLA_BASE_URL_TOKEN)
+            .build();
+
     service =
         new MvolaPaymentService(
+            conf,
             gatewayFactory,
             paymentRepository,
             paymentRequestedRepository,
@@ -206,9 +224,10 @@ class MvolaPaymentServiceTest {
 
     when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayer().getPhoneNumber()))
         .thenReturn(Optional.of(existingPayer));
-    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayee().getPhoneNumber()))
+    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(MVOLA_MSISDN))
         .thenReturn(Optional.empty());
-    when(paymentPartyMapper.toPersistence(request.getPayee())).thenReturn(new JPaymentParty());
+    when(paymentPartyMapper.toPersistence(argThat(p -> MVOLA_MSISDN.equals(p.getPhoneNumber()))))
+        .thenReturn(new JPaymentParty());
     when(paymentPartyRepository.save(any(JPaymentParty.class))).thenReturn(new JPaymentParty());
     stubPaymentSave();
     stubGatewayInitiate(randomUUID().toString());
@@ -230,7 +249,8 @@ class MvolaPaymentServiceTest {
 
     // both parties not found — both must be mapped and saved
     verify(paymentPartyMapper, times(1)).toPersistence(request.getPayer());
-    verify(paymentPartyMapper, times(1)).toPersistence(request.getPayee());
+    verify(paymentPartyMapper, times(1))
+        .toPersistence(argThat(p -> MVOLA_MSISDN.equals(p.getPhoneNumber())));
     verify(paymentPartyRepository, times(2)).save(any(JPaymentParty.class));
   }
 
@@ -638,10 +658,11 @@ class MvolaPaymentServiceTest {
     // parties not found — service creates new ones
     when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayer().getPhoneNumber()))
         .thenReturn(Optional.empty());
-    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayee().getPhoneNumber()))
+    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(MVOLA_MSISDN))
         .thenReturn(Optional.empty());
     when(paymentPartyMapper.toPersistence(request.getPayer())).thenReturn(new JPaymentParty());
-    when(paymentPartyMapper.toPersistence(request.getPayee())).thenReturn(new JPaymentParty());
+    when(paymentPartyMapper.toPersistence(argThat(p -> MVOLA_MSISDN.equals(p.getPhoneNumber()))))
+        .thenReturn(new JPaymentParty());
     when(paymentPartyRepository.save(any(JPaymentParty.class))).thenReturn(new JPaymentParty());
   }
 

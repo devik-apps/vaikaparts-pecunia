@@ -48,14 +48,16 @@ class MvolaPaymentGatewayTest extends MvolaApiTestBase {
 
   @BeforeEach
   void set_up_gateway() {
-    final var mvolaProperties = new MvolaConf();
-    mvolaProperties.setConsumerKey(randomUUID().toString());
-    mvolaProperties.setConsumerSecret(randomUUID().toString());
-    mvolaProperties.setBaseUrl(mockWebServer.url(MERCHANT_PAY_BASE_PATH).toString());
-    mvolaProperties.setTokenUrl(MVOLA_BASE_URL_TOKEN);
-    mvolaProperties.setPartnerMsisdn(PARTNER_MSISDN);
-    mvolaProperties.setPartnerName(PARTNER_NAME);
-    mvolaProperties.setCallbackUrl("https://default.callback.com/mvola");
+    final var mvolaProperties =
+        MvolaConf.builder()
+            .consumerKey(randomUUID().toString())
+            .consumerSecret(randomUUID().toString())
+            .baseUrl(mockWebServer.url(MERCHANT_PAY_BASE_PATH).toString())
+            .tokenUrl(MVOLA_BASE_URL_TOKEN)
+            .partnerMsisdn(PARTNER_MSISDN)
+            .partnerName(PARTNER_NAME)
+            .callbackUrl("https://default.callback.com/mvola")
+            .build();
 
     tokenService = Mockito.mock(MvolaTokenService.class);
     when(tokenService.getToken()).thenReturn(DUMMY_ACCESS_TOKEN);

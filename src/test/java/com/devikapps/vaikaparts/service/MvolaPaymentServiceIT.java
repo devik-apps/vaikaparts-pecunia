@@ -1,6 +1,5 @@
 package com.devikapps.vaikaparts.service;
 
-import static com.devikapps.vaikaparts.conf.EnvConf.MVOLA_MSISDN;
 import static com.devikapps.vaikaparts.model.classifier.Country.MADAGASCAR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
@@ -326,13 +325,6 @@ class MvolaPaymentServiceIT extends FacadeIT {
                 .id(randomUUID().toString())
                 .name("Customer")
                 .phoneNumber(CUSTOMER_MSISDN)
-                .country(MADAGASCAR)
-                .build())
-        .payee(
-            PaymentParty.builder()
-                .id(randomUUID().toString())
-                .name("TestMVola")
-                .phoneNumber(MVOLA_MSISDN)
                 .country(MADAGASCAR)
                 .build())
         .build();

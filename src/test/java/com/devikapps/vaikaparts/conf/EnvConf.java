@@ -1,5 +1,7 @@
 package com.devikapps.vaikaparts.conf;
 
+import static java.util.UUID.randomUUID;
+
 import com.devikapps.vaikaparts.InfraGenerated;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -13,7 +15,11 @@ public class EnvConf {
   public static final String MVOLA_BASE_URL_TOKEN = "https://developer.mvola.mg/oauth2/token";
   public static final String MVOLA_MSISDN = "0343500004";
 
-  private static final String AIRTEL_MONEY_BASE_URL = "https://openapiuat.airtel.mg";
+  public static final String AIRTEL_MONEY_BASE_URL = "https://openapiuat.airtel.mg";
+  public static final String AIRTEL_MONEY_CLIENT_ID = randomUUID().toString();
+  public static final String AIRTEL_MONEY_CLIENT_SECRET = randomUUID().toString();
+  public static final String AIRTEL_MONEY_MSISDN = "330000005";
+  public static final String AIRTEL_MONEY_PARTNER = "TestAirtelMoney";
 
   public void configureProperties(DynamicPropertyRegistry registry) {
     registry.add("payment.mvola.token-url", () -> MVOLA_BASE_URL_TOKEN);
@@ -24,10 +30,12 @@ public class EnvConf {
     registry.add("payment.mvola.consumer.key", () -> "af2oL4QUGM4beCdjlz2EMQRJaO4a");
     registry.add("payment.mvola.consumer.secret", () -> "9KbZoElwPUcFw2G6fLSC7ZiT9mUa");
 
-    registry.add("payment.airtel.client-id", () -> "test-id");
-    registry.add("payment.airtel.client-secret", () -> "test-secret");
-    registry.add("payment.airtel.base-url", () -> AIRTEL_MONEY_BASE_URL);
-    registry.add("payment.airtel.country", () -> "MG");
-    registry.add("payment.airtel.currency", () -> "MGA");
+    registry.add("payment.airtel-money.client-id", () -> AIRTEL_MONEY_CLIENT_ID);
+    registry.add("payment.airtel-money.client-secret", () -> AIRTEL_MONEY_CLIENT_SECRET);
+    registry.add("payment.airtel-money.base-url", () -> AIRTEL_MONEY_BASE_URL);
+    registry.add("payment.airtel-money.country", () -> "MG");
+    registry.add("payment.airtel-money.currency", () -> "MGA");
+    registry.add("payment.airtel-money.partner-name", () -> AIRTEL_MONEY_PARTNER);
+    registry.add("payment.airtel-money.partner-msisdn", () -> AIRTEL_MONEY_MSISDN);
   }
 }

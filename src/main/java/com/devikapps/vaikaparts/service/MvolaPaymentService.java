@@ -3,6 +3,7 @@ package com.devikapps.vaikaparts.service;
 import static com.devikapps.vaikaparts.event.model.VerificationStatus.FAILED;
 import static com.devikapps.vaikaparts.event.model.VerificationStatus.PENDING;
 import static com.devikapps.vaikaparts.event.model.VerificationStatus.SUCCESS;
+import static com.devikapps.vaikaparts.model.classifier.Country.MADAGASCAR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.AR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.MVOLA;
 import static com.devikapps.vaikaparts.service.util.Paginator.PAGE_FIELD;
@@ -12,6 +13,7 @@ import static java.time.LocalDateTime.now;
 import static java.util.UUID.randomUUID;
 import static org.owasp.encoder.Encode.forJava;
 
+import com.devikapps.vaikaparts.config.MvolaConf;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
 import com.devikapps.vaikaparts.event.model.EventProducer;
 import com.devikapps.vaikaparts.event.model.PaymentVerificationRequested;
@@ -51,6 +53,7 @@ import org.springframework.validation.annotation.Validated;
 @RequiredArgsConstructor
 public class MvolaPaymentService implements PaymentService {
 
+  private final MvolaConf conf;
   private final PaymentGatewayFactory gatewayFactory;
   private final PaymentRepository paymentRepository;
   private final PaymentRequestedRepository paymentRequestedRepository;
@@ -90,6 +93,7 @@ public class MvolaPaymentService implements PaymentService {
         "MVola initiatePayment for phoneNumber={}", forJava(request.getPayer().getPhoneNumber()));
 
     var payment = buildPaymentFromPaymentRequest(request);
+    request.setPayee(paymentPartyMapper.toModel(payment.getPayee()));
     log.info("MVola initiatePayment. Payment created with id={}", payment.getId());
 
     var paymentVerificationRequestedInstance =
@@ -195,11 +199,21 @@ public class MvolaPaymentService implements PaymentService {
   private JMvolaPayment buildPaymentFromPaymentRequest(PaymentRequest request) {
     final var createdAt = now();
 
+    // The reason why this Payee is build each time we make a payment to make sure we just have to
+    // change the payee
+    // number to the .env and everything works perfectly fine without touching the database.
+    var payee =
+        PaymentParty.builder()
+            .phoneNumber(conf.getPartnerMsisdn())
+            .name(conf.getPartnerName())
+            .country(MADAGASCAR)
+            .build();
+
     var payment =
         JMvolaPayment.builder()
             .id(randomUUID().toString())
             .payer(resolvePaymentParty(request.getPayer()))
-            .payee(resolvePaymentParty(request.getPayee()))
+            .payee(resolvePaymentParty(payee))
             .amount(request.getAmount())
             .description(request.getDescription())
             .provider(MVOLA)

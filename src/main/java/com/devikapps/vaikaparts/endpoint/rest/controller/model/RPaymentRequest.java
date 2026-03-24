@@ -23,5 +23,4 @@ public class RPaymentRequest {
   private @NotNull @NotBlank String description;
   private @NotNull PaymentType type;
   private @NotNull @Valid PaymentParty payer;
-  private @NotNull @Valid PaymentParty payee;
 }

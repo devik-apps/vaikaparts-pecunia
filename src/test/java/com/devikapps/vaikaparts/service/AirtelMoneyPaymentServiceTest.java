@@ -1,7 +1,11 @@
 package com.devikapps.vaikaparts.service;
 
-import static com.devikapps.vaikaparts.client.airtel.AbstractAirtelMoneyTestBase.SAMPLE_MSISDN;
 import static com.devikapps.vaikaparts.client.airtel.AbstractAirtelMoneyTestBase.TEST_MSISDN;
+import static com.devikapps.vaikaparts.conf.EnvConf.AIRTEL_MONEY_BASE_URL;
+import static com.devikapps.vaikaparts.conf.EnvConf.AIRTEL_MONEY_CLIENT_ID;
+import static com.devikapps.vaikaparts.conf.EnvConf.AIRTEL_MONEY_CLIENT_SECRET;
+import static com.devikapps.vaikaparts.conf.EnvConf.AIRTEL_MONEY_MSISDN;
+import static com.devikapps.vaikaparts.conf.EnvConf.AIRTEL_MONEY_PARTNER;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.MGA;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.AIRTEL_MONEY;
 import static com.devikapps.vaikaparts.service.util.Paginator.PAGE_FIELD;
@@ -16,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atLeastOnce;
@@ -25,6 +30,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.devikapps.vaikaparts.config.AirtelMoneyConf;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.AirtelMoneyCallBackRequest;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.AirtelMoneyCallBackTransaction;
 import com.devikapps.vaikaparts.event.model.EventProducer;
@@ -88,8 +94,20 @@ class AirtelMoneyPaymentServiceTest {
   @BeforeEach
   void set_up() {
     TransactionSynchronizationManager.initSynchronization();
+    var conf =
+        AirtelMoneyConf.builder()
+            .partnerMsisdn(AIRTEL_MONEY_MSISDN)
+            .partnerName(AIRTEL_MONEY_PARTNER)
+            .baseUrl(AIRTEL_MONEY_BASE_URL)
+            .clientId(AIRTEL_MONEY_CLIENT_ID)
+            .clientSecret(AIRTEL_MONEY_CLIENT_SECRET)
+            .country("MG")
+            .currency(MGA.toString())
+            .build();
+
     subject =
         new AirtelMoneyPaymentService(
+            conf,
             gatewayFactory,
             paymentRepository,
             paymentRequestedRepository,
@@ -193,10 +211,11 @@ class AirtelMoneyPaymentServiceTest {
 
     when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayer().getPhoneNumber()))
         .thenReturn(Optional.of(existingPayer));
-    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayee().getPhoneNumber()))
+    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(AIRTEL_MONEY_MSISDN))
         .thenReturn(Optional.empty());
-    when(paymentPartyMapper.toPersistence(request.getPayee())).thenReturn(new JPaymentParty());
-    when(paymentPartyRepository.save(any(JPaymentParty.class))).thenReturn(new JPaymentParty());
+    when(paymentPartyMapper.toPersistence(
+            argThat(p -> AIRTEL_MONEY_MSISDN.equals(p.getPhoneNumber()))))
+        .thenReturn(new JPaymentParty());
     stubPaymentSave();
     stubGatewayInitiate();
     when(gatewayFactory.getGateway(AIRTEL_MONEY)).thenReturn(airtelGateway);
@@ -215,7 +234,8 @@ class AirtelMoneyPaymentServiceTest {
     subject.initiatePayment(request);
 
     verify(paymentPartyMapper, times(1)).toPersistence(request.getPayer());
-    verify(paymentPartyMapper, times(1)).toPersistence(request.getPayee());
+    verify(paymentPartyMapper, times(1))
+        .toPersistence(argThat(p -> AIRTEL_MONEY_MSISDN.equals(p.getPhoneNumber())));
     verify(paymentPartyRepository, times(2)).save(any(JPaymentParty.class));
   }
 
@@ -593,7 +613,6 @@ class AirtelMoneyPaymentServiceTest {
         .provider(AIRTEL_MONEY)
         .type(PaymentType.PROFILE_UNLOCK)
         .payer(PaymentParty.builder().phoneNumber(TEST_MSISDN).build())
-        .payee(PaymentParty.builder().phoneNumber(SAMPLE_MSISDN).build())
         .build();
   }
 
@@ -617,10 +636,12 @@ class AirtelMoneyPaymentServiceTest {
   private void stubPartyResolution(AirtelMoneyPaymentRequest request) {
     when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayer().getPhoneNumber()))
         .thenReturn(Optional.empty());
-    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(request.getPayee().getPhoneNumber()))
+    when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(AIRTEL_MONEY_MSISDN))
         .thenReturn(Optional.empty());
     when(paymentPartyMapper.toPersistence(request.getPayer())).thenReturn(new JPaymentParty());
-    when(paymentPartyMapper.toPersistence(request.getPayee())).thenReturn(new JPaymentParty());
+    when(paymentPartyMapper.toPersistence(
+            argThat(p -> AIRTEL_MONEY_MSISDN.equals(p.getPhoneNumber()))))
+        .thenReturn(new JPaymentParty());
     when(paymentPartyRepository.save(any(JPaymentParty.class))).thenReturn(new JPaymentParty());
   }
 

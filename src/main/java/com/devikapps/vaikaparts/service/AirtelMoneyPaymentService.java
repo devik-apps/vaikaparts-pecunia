@@ -3,6 +3,7 @@ package com.devikapps.vaikaparts.service;
 import static com.devikapps.vaikaparts.event.model.VerificationStatus.FAILED;
 import static com.devikapps.vaikaparts.event.model.VerificationStatus.PENDING;
 import static com.devikapps.vaikaparts.event.model.VerificationStatus.SUCCESS;
+import static com.devikapps.vaikaparts.model.classifier.Country.MADAGASCAR;
 import static com.devikapps.vaikaparts.model.classifier.PaymentCurrency.MGA;
 import static com.devikapps.vaikaparts.model.classifier.PaymentProvider.AIRTEL_MONEY;
 import static com.devikapps.vaikaparts.service.util.Paginator.PAGE_FIELD;
@@ -12,6 +13,7 @@ import static java.time.LocalDateTime.now;
 import static java.util.UUID.randomUUID;
 import static org.owasp.encoder.Encode.forJava;
 
+import com.devikapps.vaikaparts.config.AirtelMoneyConf;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.AirtelMoneyCallBackRequest;
 import com.devikapps.vaikaparts.event.model.EventProducer;
 import com.devikapps.vaikaparts.event.model.PaymentVerificationRequested;
@@ -54,6 +56,7 @@ import org.springframework.validation.annotation.Validated;
 @RequiredArgsConstructor
 public class AirtelMoneyPaymentService implements PaymentService {
 
+  private final AirtelMoneyConf conf;
   private final PaymentGatewayFactory gatewayFactory;
   private final PaymentRepository paymentRepository;
   private final PaymentRequestedRepository paymentRequestedRepository;
@@ -203,11 +206,18 @@ public class AirtelMoneyPaymentService implements PaymentService {
   private JAirtelMoneyPayment buildPaymentFromRequest(PaymentRequest request) {
     var createdAt = now();
 
+    var payee =
+        PaymentParty.builder()
+            .phoneNumber(conf.getPartnerMsisdn())
+            .name(conf.getPartnerName())
+            .country(MADAGASCAR)
+            .build();
+
     var payment =
         JAirtelMoneyPayment.builder()
             .id(randomUUID().toString())
             .payer(resolvePaymentParty(request.getPayer()))
-            .payee(resolvePaymentParty(request.getPayee()))
+            .payee(resolvePaymentParty(payee))
             .amount(request.getAmount())
             .description(request.getDescription())
             .provider(AIRTEL_MONEY)

@@ -1,7 +1,10 @@
 package com.devikapps.vaikaparts.config;
 
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -11,6 +14,9 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @Getter
 @Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class MvolaConf {
 
   @Value("${payment.mvola.consumer.key}")

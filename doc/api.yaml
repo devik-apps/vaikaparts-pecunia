@@ -152,6 +152,8 @@ paths:
       summary: Initiate a payment
       description: Initiates a new MVola merchant pay transaction. The payment is created with a PENDING status. The caller must poll GET /{transactionId} or wait for the callback to know the final status.
       operationId: initiateMvolaPayment
+      security:
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -180,6 +182,8 @@ paths:
       summary: Get all Mvola payment by to a customer MSISDN.
       operationId: getMvolaPaymentsByCustomerMsisdn
       description: Retrieves all existing mvola payment transaction done by a given Customer MSISDN with possibility to retrieve with a given page and size.
+      security:
+        - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/CustomerMsisdn'
         - $ref: '#/components/parameters/Page'
@@ -206,6 +210,8 @@ paths:
       summary: Get a payment by transaction ID
       description: Retrieves an existing MVola payment by its transaction ID. The transaction ID is the serverCorrelationId returned by the initiate endpoint.
       operationId: getMvolaPayment
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: transactionId
           in: path
@@ -261,6 +267,8 @@ paths:
       summary: Initiate a payment
       description: Initiates a new Airtel Money merchant pay transaction. The payment is created with a PENDING status. The caller must poll GET /{transactionId} or wait for the callback to know the final status.
       operationId: initiateAirtelMoneyPayment
+      security:
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -289,6 +297,8 @@ paths:
       summary: Get all Airtel Money payment by to a customer MSISDN.
       operationId: getAirtelMoneyPaymentsByCustomerMsisdn
       description: Retrieves all existing Airtel Money payment transaction done by a given Customer MSISDN with possibility to retrieve with a given page and size.
+      security:
+        - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/CustomerMsisdn'
         - $ref: '#/components/parameters/Page'
@@ -315,6 +325,8 @@ paths:
       summary: Get a payment by transaction ID
       description: Retrieves an existing Airtel Money payment by its transaction ID.
       operationId: getAirtelMoneyPayment
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: transactionId
           in: path
@@ -364,6 +376,12 @@ paths:
         500:
           $ref: '#/components/responses/InternalServer'
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: This is an unique api with what the vaikaparts backend will communicate with this service.
   parameters:
     CustomerMsisdn:
       name: customer-msisdn

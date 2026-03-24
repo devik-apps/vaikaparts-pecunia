@@ -22,6 +22,8 @@ public class EnvConf {
   public static final String AIRTEL_MONEY_PARTNER = "TestAirtelMoney";
 
   public void configureProperties(DynamicPropertyRegistry registry) {
+    registry.add("app.security.api-key", () -> randomUUID().toString());
+
     registry.add("payment.mvola.token-url", () -> MVOLA_BASE_URL_TOKEN);
     registry.add("payment.mvola.base-url", () -> MVOLA_BASE_URL);
     registry.add("payment.mvola.partner-msisdn", () -> MVOLA_MSISDN);

@@ -35,7 +35,7 @@ public class MvolaController {
   private final PaymentRequestMapper paymentRequestMapper;
 
   @PostMapping
-  public ResponseEntity<MvolaPayment> initiatePayment(
+  public ResponseEntity<MvolaPayment> initiateMvolaPayment(
       @Valid @NotNull @RequestBody RPaymentRequest request) {
     log.info("MVola Payment initiation at POST /v1/payments/mvola");
 
@@ -46,7 +46,7 @@ public class MvolaController {
   }
 
   @GetMapping("/customer/{customer-msisdn}")
-  public Page<MvolaPayment> getPaymentsByCustomerMsisdn(
+  public Page<MvolaPayment> getMvolaPaymentsByCustomerMsisdn(
       @PathVariable(name = "customer-msisdn") @NotNull String customerMsisdn,
       @RequestParam(name = "page", required = false) Integer page,
       @RequestParam(name = "size", required = false) Integer size) {
@@ -57,13 +57,13 @@ public class MvolaController {
   }
 
   @GetMapping("/{transactionId}")
-  public MvolaPayment getPayment(@PathVariable @NotNull String transactionId) {
+  public MvolaPayment getMvolaPayment(@PathVariable @NotNull String transactionId) {
     log.info("MVola Payment get at GET /v1/payments/mvola/{}", forJava(transactionId));
     return (MvolaPayment) mvolaPaymentService.getPayment(transactionId);
   }
 
   @PutMapping("/callback")
-  public ResponseEntity<Void> handleCallBack(
+  public ResponseEntity<Void> handleMvolaCallBack(
       @RequestBody @NotNull final MvolaCallBackRequest request) {
     log.info(
         "PUT /v1/payments/mvola/callback — serverCorrelationId={}, status={}",

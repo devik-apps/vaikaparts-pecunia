@@ -573,7 +573,6 @@ components:
       required:
         - amount
         - payer
-        - payee
         - type
       properties:
         amount:
@@ -587,8 +586,6 @@ components:
           type: string
           example: "Profile unlock payment"
         payer:
-          $ref: '#/components/schemas/PaymentParty'
-        payee:
           $ref: '#/components/schemas/PaymentParty'
         type:
           $ref: '#/components/schemas/PaymentType'

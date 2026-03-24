@@ -17,7 +17,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @Builder
-public class RMvolaPaymentRequest {
+public class RPaymentRequest {
   private @NotNull double amount;
   private @NotNull PaymentCurrency currency;
   private @NotNull @NotBlank String description;

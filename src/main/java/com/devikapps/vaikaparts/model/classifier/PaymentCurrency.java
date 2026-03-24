@@ -1,5 +1,6 @@
 package com.devikapps.vaikaparts.model.classifier;
 
 public enum PaymentCurrency {
-  AR
+  AR,
+  MGA
 }

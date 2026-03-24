@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.devikapps.vaikaparts.conf.FacadeIT;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.MvolaCallBackRequest;
-import com.devikapps.vaikaparts.endpoint.rest.controller.model.RMvolaPaymentRequest;
+import com.devikapps.vaikaparts.endpoint.rest.controller.model.RPaymentRequest;
 import com.devikapps.vaikaparts.event.model.VerificationStatus;
 import com.devikapps.vaikaparts.mapper.PaymentRequestMapper;
 import com.devikapps.vaikaparts.model.MvolaPayment;
@@ -229,8 +229,8 @@ class MvolaControllerIT extends FacadeIT {
         .andExpect(status().isNotFound());
   }
 
-  private RMvolaPaymentRequest buildValidRequest() {
-    return RMvolaPaymentRequest.builder()
+  private RPaymentRequest buildValidRequest() {
+    return RPaymentRequest.builder()
         .amount(100)
         .currency(AR)
         .description("Integration test payment")

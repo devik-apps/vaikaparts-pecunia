@@ -130,18 +130,10 @@ paths:
       tags:
         - Health
       parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 0
-          description: Page number (0-based)
-        - in: query
-          name: size
-          schema:
-            type: integer
-            default: 10
-          description: Page size
+        - name: page
+          $ref: '#/components/parameters/Page'
+        - name: size
+          $ref: '#/components/parameters/PageSize'
       responses:
         200:
           description: Successful database health check
@@ -159,7 +151,7 @@ paths:
         - MVola
       summary: Initiate a payment
       description: Initiates a new MVola merchant pay transaction. The payment is created with a PENDING status. The caller must poll GET /{transactionId} or wait for the callback to know the final status.
-      operationId: initiatePayment
+      operationId: initiateMvolaPayment
       requestBody:
         required: true
         content:
@@ -186,27 +178,12 @@ paths:
       tags:
         - MVola
       summary: Get all Mvola payment by to a customer MSISDN.
-      operationId: getPaymentsByCustomerMsisdn
+      operationId: getMvolaPaymentsByCustomerMsisdn
       description: Retrieves all existing mvola payment transaction done by a given Customer MSISDN with possibility to retrieve with a given page and size.
       parameters:
-        - name: customer-msisdn
-          in: path
-          required: true
-          description: The customer msisdn with what the Mvola payment was done.
-          schema:
-            $ref: '#/components/schemas/PhoneNumber'
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 0
-          description: Page number (0-based)
-        - in: query
-          name: size
-          schema:
-            type: integer
-            default: 10
-          description: Page size
+        - $ref: '#/components/parameters/CustomerMsisdn'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
       responses:
         200:
           description: List of pagined Mvola payment done by the Customer with given MSISDN.
@@ -228,7 +205,7 @@ paths:
         - MVola
       summary: Get a payment by transaction ID
       description: Retrieves an existing MVola payment by its transaction ID. The transaction ID is the serverCorrelationId returned by the initiate endpoint.
-      operationId: getPayment
+      operationId: getMvolaPayment
       parameters:
         - name: transactionId
           in: path
@@ -259,7 +236,7 @@ paths:
       description: >
         Endpoint invoked by MVola via PUT when a transaction reaches a terminal status (completed or failed). This endpoint is not called by the client — it is called by MVola's infrastructure only. On success, returns HTTP 200 with no body.
 
-      operationId: handleCallBack
+      operationId: handleMvolaCallBack
       requestBody:
         required: true
         content:
@@ -277,7 +254,138 @@ paths:
           $ref: '#/components/responses/Forbidden'
         500:
           $ref: '#/components/responses/InternalServer'
+  /v1/payments/airtel-money:
+    post:
+      tags:
+        - Airtel Money
+      summary: Initiate a payment
+      description: Initiates a new Airtel Money merchant pay transaction. The payment is created with a PENDING status. The caller must poll GET /{transactionId} or wait for the callback to know the final status.
+      operationId: initiateAirtelMoneyPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AirtelMoneyPaymentRequest'
+      responses:
+        '201':
+          description: Payment successfully initiated. Status is always PENDING at this stage.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AirtelMoneyPayment'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/airtel-money/customer/{customer-msisdn}:
+    get:
+      tags:
+        - Airtel Money
+      summary: Get all Airtel Money payment by to a customer MSISDN.
+      operationId: getAirtelMoneyPaymentsByCustomerMsisdn
+      description: Retrieves all existing Airtel Money payment transaction done by a given Customer MSISDN with possibility to retrieve with a given page and size.
+      parameters:
+        - $ref: '#/components/parameters/CustomerMsisdn'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        200:
+          description: List of pagined Airtel Money payment done by the Customer with given MSISDN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AirtelMoneyPaymentPageResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/airtel-money/{transactionId}:
+    get:
+      tags:
+        - Airtel Money
+      summary: Get a payment by transaction ID
+      description: Retrieves an existing Airtel Money payment by its transaction ID.
+      operationId: getAirtelMoneyPayment
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          description: The transaction ID of the payment to retrieve.
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Payment found and returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AirtelMoneyPayment'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/airtel-money/callback:
+    put:
+      tags:
+        - Airtel Money
+      summary: Receive Airtel Money payment callback
+      description: >
+        Endpoint invoked by Airtel Money via PUT when a transaction reaches a terminal status (completed or failed). This endpoint is not called by the client — it is called by Airtel Money's infrastructure only. On success, returns HTTP 200 with no body.
+
+      operationId: handleAirtelMoneyCallBack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AirtelMoneyCallBackRequest'
+      responses:
+        '200':
+          description: Callback received and processed successfully. No response body.
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        500:
+          $ref: '#/components/responses/InternalServer'
 components:
+  parameters:
+    CustomerMsisdn:
+      name: customer-msisdn
+      in: path
+      required: true
+      description: The customer msisdn with what the Mvola payment was done.
+      schema:
+        $ref: '#/components/schemas/PhoneNumber'
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+      description: Page number (0-based)
+    PageSize:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 10
+      description: Page size
   schemas:
     DateTime:
       type: string
@@ -395,6 +503,15 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/MvolaPayment'
+    AirtelMoneyPaymentPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/AirtelMoneyPayment'
     BasePayment:
       type: object
       description: Base payment domain model shared across all payment providers.
@@ -443,6 +560,13 @@ components:
           example: "b7c3d4e5-f6a7-8901-bcde-f12345678901"
         notification_method:
           $ref: '#/components/schemas/MvolaNotificationMethod'
+    AirtelMoneyPayment:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/BasePayment'
+      properties:
+        airtel_money_id:
+          $ref: '#/components/schemas/UUID'
     BasePaymentRequest:
       type: object
       description: Base payment request shared across all payment providers.
@@ -472,6 +596,39 @@ components:
       type: object
       allOf:
         - $ref: '#/components/schemas/BasePaymentRequest'
+    AirtelMoneyPaymentRequest:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/BasePaymentRequest'
+    AirtelMoneyCAllBackTransaction:
+      type: object
+      description: This is the transaction payload sent by Airtel Money as part of the request body for callback url
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        message:
+          description: This is the description of the transaction
+          type: string
+          example: Random description
+        status_code:
+          description: This is the Airtel transaction status code.
+          type: string
+          enum: [TS, TF]
+          example: TS
+        airtel_money_id:
+          description: This is the airtel money system-generated transaction id
+          type: string
+          example: XDFI-D145DF
+    AirtelMoneyCallBackRequest:
+      type: object
+      description: Callback payload sent by Airtel Money via POST when a transaction completes or fails
+      properties:
+        transaction:
+          $ref: '#/components/schemas/AirtelMoneyCAllBackTransaction'
+        hash:
+          description: HMAC hash sent by Airtel when callback authentication is enabled. Null when callback authentication is disabled.
+          type: string
+          example: 968c2349040273dd57dc4be7e238c5ac200ceac5
     MvolaCallBackRequest:
       type: object
       description: Callback payload sent by MVola via PUT when a transaction completes or fails.

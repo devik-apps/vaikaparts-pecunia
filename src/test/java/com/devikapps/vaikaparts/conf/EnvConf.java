@@ -13,6 +13,8 @@ public class EnvConf {
   public static final String MVOLA_BASE_URL_TOKEN = "https://developer.mvola.mg/oauth2/token";
   public static final String MVOLA_MSISDN = "0343500004";
 
+  private static final String AIRTEL_MONEY_BASE_URL = "https://openapiuat.airtel.mg";
+
   public void configureProperties(DynamicPropertyRegistry registry) {
     registry.add("payment.mvola.token-url", () -> MVOLA_BASE_URL_TOKEN);
     registry.add("payment.mvola.base-url", () -> MVOLA_BASE_URL);
@@ -21,5 +23,11 @@ public class EnvConf {
     registry.add("payment.mvola.callback-url", () -> "");
     registry.add("payment.mvola.consumer.key", () -> "af2oL4QUGM4beCdjlz2EMQRJaO4a");
     registry.add("payment.mvola.consumer.secret", () -> "9KbZoElwPUcFw2G6fLSC7ZiT9mUa");
+
+    registry.add("payment.airtel.client-id", () -> "test-id");
+    registry.add("payment.airtel.client-secret", () -> "test-secret");
+    registry.add("payment.airtel.base-url", () -> AIRTEL_MONEY_BASE_URL);
+    registry.add("payment.airtel.country", () -> "MG");
+    registry.add("payment.airtel.currency", () -> "MGA");
   }
 }

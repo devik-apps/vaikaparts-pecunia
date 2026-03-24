@@ -1,7 +1,10 @@
+import org.openapitools.generator.gradle.plugin.tasks.GenerateTask
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.12'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.openapi.generator' version '7.20.0'
 }
 
 java {
@@ -109,6 +112,9 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.13.2'
     implementation 'io.gsonfire:gson-fire:1.9.0'
     implementation 'org.apache.oltu.oauth2:org.apache.oltu.oauth2.client:1.0.2'
+
+    testImplementation 'io.swagger.core.v3:swagger-annotations:2.2.45'
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.45'
 }
 
 tasks.named('test') {
@@ -133,4 +139,33 @@ tasks.named('test') {
         showCauses = true
         showStackTraces = true
     }
+}
+
+
+tasks.register('generateJavaClient', GenerateTask) {
+    generatorName = "java"
+    inputSpec = file("${projectDir}/doc/api.yaml").toURI().toString()
+    outputDir = layout.buildDirectory.dir("generated/openapi-client").get().asFile.absolutePath
+    apiPackage = "com.devikapps.vaikaparts.pecunia.client.api"
+    modelPackage = "com.devikapps.vaikaparts.pecunia.client.model"
+    invokerPackage = "com.devikapps.vaikaparts.pecunia.client.invoker"
+
+    groupId = "com.devikapps.vaikaparts.pecunia"
+    id = "vaikaparts-pecunia-client-gen"
+    version = "1.0.0"
+
+    configOptions = [
+            serializableModel      : "true",
+            serializationLibrary   : "jackson",
+            useJakartaEe           : "true",
+            dateLibrary            : "java8-localdatetime",
+            openApiNullable        : "false",
+            hideGenerationTimestamp: "true",
+    ]
+
+    library = "restclient"
+    skipValidateSpec = false
+    logToStderr = true
+    generateAliasAsModel = false
+    enablePostProcessFile = false
 }

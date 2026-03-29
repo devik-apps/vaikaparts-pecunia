@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class MvolaResponseParser {
 
-  private static final String STATUS_PENDING = "pending";
   private static final String STATUS_COMPLETED = "completed";
   private static final String STATUS_FAILED = "failed";
 

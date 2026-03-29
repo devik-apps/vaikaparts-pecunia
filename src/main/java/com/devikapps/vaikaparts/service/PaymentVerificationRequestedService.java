@@ -110,7 +110,7 @@ public class PaymentVerificationRequestedService implements Consumer<PaymentVeri
           payment,
           paymentVerificationRequested,
           event,
-          format("Max verification attempts (%d) reached with status still PENDING.", maxAttempts));
+          format("Max verification attempts %d reached with status still PENDING.", maxAttempts));
       return;
     }
 

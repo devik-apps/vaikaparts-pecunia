@@ -113,8 +113,8 @@ dependencies {
     implementation 'io.gsonfire:gson-fire:1.9.0'
     implementation 'org.apache.oltu.oauth2:org.apache.oltu.oauth2.client:1.0.2'
 
-    testImplementation 'io.swagger.core.v3:swagger-annotations:2.2.45'
-    implementation 'io.swagger.core.v3:swagger-annotations:2.2.45'
+    testImplementation 'io.swagger.core.v3:swagger-annotations:2.2.46'
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.46'
 }
 
 tasks.named('test') {

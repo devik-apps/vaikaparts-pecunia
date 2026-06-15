@@ -101,8 +101,8 @@ dependencies {
 
     testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testImplementation 'com.icegreen:greenmail:2.1.8'
-    testImplementation 'com.icegreen:greenmail-junit5:2.1.8'
+    testImplementation 'com.icegreen:greenmail:2.1.9'
+    testImplementation 'com.icegreen:greenmail-junit5:2.1.9'
 
     implementation 'com.devik-apps:mvola-client:1.0.0'
     implementation 'dev.razafindratelo:airtel-money-client-gen:1.0.0'

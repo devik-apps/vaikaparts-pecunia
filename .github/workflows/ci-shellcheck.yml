@@ -15,7 +15,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Make shellcheck executable
         run: chmod +x ./shellcheck
       - name: Find all shell scripts

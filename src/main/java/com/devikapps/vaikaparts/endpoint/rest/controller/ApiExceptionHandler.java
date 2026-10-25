@@ -6,6 +6,7 @@ import static org.owasp.encoder.Encode.forJava;
 import com.devikapps.vaikaparts.InfraGenerated;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.ErrorResponse;
 import com.devikapps.vaikaparts.exception.MissingAuthorizationException;
+import com.devikapps.vaikaparts.exception.PaymentConflictException;
 import com.devikapps.vaikaparts.exception.health.EmailHealthCheckException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
@@ -230,6 +231,15 @@ public class ApiExceptionHandler {
         ErrorResponse.of(
             HttpStatus.NOT_FOUND, ex.getMessage(), getRequestPath(request), "ENTITY_NOT_FOUND");
     return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+  }
+
+  @ExceptionHandler(PaymentConflictException.class)
+  public ResponseEntity<ErrorResponse> handlePaymentConflict(
+      PaymentConflictException ex, WebRequest request) {
+    var errorResponse =
+        ErrorResponse.of(
+            HttpStatus.CONFLICT, ex.getMessage(), getRequestPath(request), "PAYMENT_CONFLICT");
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -37,3 +37,12 @@ springdoc:
     enabled: true
   swagger-ui:
     url: /doc/api.yaml
+payment:
+  papi:
+    api-key: ${PAPI_API_KEY:}
+    base-url: ${PAPI_BASE_URL:https://app.papi.mg/engine/api}
+    notification-url: ${PAPI_NOTIFICATION_URL:}
+    webhook-secret: ${PAPI_WEBHOOK_SECRET:}
+    test-mode: ${PAPI_TEST_MODE:false}
+    partner-name: ${PAPI_PARTNER_NAME:}
+    partner-msisdn: ${PAPI_PARTNER_MSISDN:}

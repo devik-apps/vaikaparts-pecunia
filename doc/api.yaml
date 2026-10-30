@@ -375,6 +375,102 @@ paths:
           $ref: '#/components/responses/Forbidden'
         500:
           $ref: '#/components/responses/InternalServer'
+  /v1/payments/papi:
+    post:
+      tags:
+        - Papi
+      summary: Initiate a payment through Papi
+      description: >
+        Initiates a Papi payment using MVOLA, AIRTEL_MONEY, or ORANGE_MONEY. Amounts are integer MGA values of at least 300. For Orange Money, temporaryCode is required. The caller must supply the same reference and payment details when retrying a network error.
+      operationId: initiatePapiPayment
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PapiPaymentRequest'
+      responses:
+        '201':
+          description: Payment initiated or current idempotent payment returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PapiPayment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Payment reference conflicts with an existing payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/papi/{reference}:
+    get:
+      tags:
+        - Papi
+      summary: Retrieve a Papi payment
+      description: Returns the locally stored payment and refreshes its status from Papi while it is pending.
+      operationId: getPapiPayment
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 255
+      responses:
+        '200':
+          description: Payment found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PapiPayment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/papi/callback:
+    post:
+      tags:
+        - Papi
+      summary: Receive a signed Papi payment notification
+      description: Verifies the raw request-body signature before processing. Duplicate valid notifications are accepted idempotently.
+      operationId: handlePapiCallback
+      security: []
+      parameters:
+        - name: X-Papi-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+            example: t=1757750400,v1=66c446f11f07c733a8ded2580681d7e0430cc490637479178506fd2a66595d53
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PapiCallBackRequest'
+      responses:
+        '200':
+          description: Notification verified and processed.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServer'
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -585,6 +681,52 @@ components:
       properties:
         airtel_money_id:
           $ref: '#/components/schemas/UUID'
+    PapiPayment:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        transactionId:
+          type: string
+          description: Merchant payment reference supplied by the caller.
+        merchantReference:
+          type: string
+          maxLength: 255
+        papiPaymentReference:
+          type: string
+          nullable: true
+        paymentMethod:
+          $ref: '#/components/schemas/PapiPaymentMethod'
+        notificationToken:
+          type: string
+          nullable: true
+        description:
+          type: string
+        payer:
+          $ref: '#/components/schemas/PaymentParty'
+        payee:
+          $ref: '#/components/schemas/PaymentParty'
+        provider:
+          type: string
+          enum: [PAPI]
+        type:
+          $ref: '#/components/schemas/PaymentType'
+        amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          enum: [MGA]
+        status:
+          $ref: '#/components/schemas/VerificationStatus'
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+        updatedAt:
+          $ref: '#/components/schemas/DateTime'
+    PapiPaymentMethod:
+      type: string
+      enum: [MVOLA, AIRTEL_MONEY, ORANGE_MONEY]
+      example: MVOLA
     BasePaymentRequest:
       type: object
       description: Base payment request shared across all payment providers.
@@ -615,6 +757,65 @@ components:
       type: object
       allOf:
         - $ref: '#/components/schemas/BasePaymentRequest'
+    PapiPaymentRequest:
+      type: object
+      required: [amount, type, description, reference, paymentMethod, payer]
+      properties:
+        amount:
+          type: integer
+          minimum: 300
+          description: Integer amount in MGA.
+          example: 5000
+        type:
+          $ref: '#/components/schemas/PaymentType'
+        description:
+          type: string
+          maxLength: 255
+        reference:
+          type: string
+          maxLength: 255
+          description: Stable order reference and Papi idempotency key.
+        paymentMethod:
+          $ref: '#/components/schemas/PapiPaymentMethod'
+        payer:
+          type: object
+          required: [name, phoneNumber]
+          properties:
+            name:
+              type: string
+              maxLength: 255
+            phoneNumber:
+              type: string
+              description: Mobile money phone number in national or international format.
+            country:
+              type: string
+        payerEmail:
+          type: string
+          format: email
+        temporaryCode:
+          type: string
+          description: Required only when paymentMethod is ORANGE_MONEY.
+    PapiCallBackRequest:
+      type: object
+      required: [merchantPaymentReference, paymentReference, paymentStatus, notificationToken]
+      properties:
+        merchantPaymentReference:
+          type: string
+        paymentReference:
+          type: string
+        paymentStatus:
+          type: string
+          enum: [PENDING, SUCCESS, FAILED]
+        paymentMethod:
+          $ref: '#/components/schemas/PapiPaymentMethod'
+        notificationToken:
+          type: string
+        amount:
+          type: number
+        fee:
+          type: number
+        message:
+          type: string
     AirtelMoneyCAllBackTransaction:
       type: object
       description: This is the transaction payload sent by Airtel Money as part of the request body for callback url
@@ -716,6 +917,7 @@ components:
         - MVOLA
         - ORANGE_MONEY
         - AIRTEL_MONEY
+        - PAPI
       example: "MVOLA"
     PaymentType:
       type: string
@@ -726,6 +928,7 @@ components:
       type: string
       enum:
         - AR
+        - MGA
       example: "AR"
     VerificationStatus:
       type: string

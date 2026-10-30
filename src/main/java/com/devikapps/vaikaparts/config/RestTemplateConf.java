@@ -11,4 +11,9 @@ public class RestTemplateConf {
   public RestTemplate mvolaRestTemplate() {
     return new RestTemplate();
   }
+
+  @Bean
+  public RestTemplate papiRestTemplate() {
+    return new RestTemplate();
+  }
 }

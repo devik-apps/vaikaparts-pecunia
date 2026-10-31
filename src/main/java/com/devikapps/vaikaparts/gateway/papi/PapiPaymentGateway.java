@@ -31,8 +31,7 @@ public class PapiPaymentGateway extends AbstractPaymentGateway {
   private final PapiClient client;
   private final PapiConf conf;
 
-  public PapiPaymentGateway(
-      PaymentRequestValidator validator, PapiClient client, PapiConf conf) {
+  public PapiPaymentGateway(PaymentRequestValidator validator, PapiClient client, PapiConf conf) {
     super(validator);
     this.client = client;
     this.conf = conf;
@@ -165,6 +164,8 @@ public class PapiPaymentGateway extends AbstractPaymentGateway {
     response.setNotificationToken(data.notificationToken());
     response.setStatus(status);
     response.setAmount(data.amount());
+    response.setPayerFee(data.payerFee());
+    response.setTotalAmount(data.totalAmount());
     response.setCurrency(MGA);
     response.setProvider(PAPI);
     response.setRespondedAt(now());

@@ -11,16 +11,19 @@ import static java.time.LocalDateTime.now;
 import static java.util.UUID.randomUUID;
 import static org.owasp.encoder.Encode.forJava;
 
+import com.devikapps.vaikaparts.client.papi.PapiClient;
+import com.devikapps.vaikaparts.client.papi.model.PapiFeeQuoteResponse;
 import com.devikapps.vaikaparts.config.PapiConf;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.PapiCallBackRequest;
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.RPapiPaymentRequest;
+import com.devikapps.vaikaparts.exception.PapiWebhookSecurityException;
 import com.devikapps.vaikaparts.exception.PaymentConflictException;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
 import com.devikapps.vaikaparts.exception.PaymentValidationException;
-import com.devikapps.vaikaparts.exception.PapiWebhookSecurityException;
 import com.devikapps.vaikaparts.gateway.PaymentGatewayFactory;
 import com.devikapps.vaikaparts.mapper.PapiPaymentMapper;
 import com.devikapps.vaikaparts.mapper.PaymentPartyMapper;
+import com.devikapps.vaikaparts.model.PapiFeeQuote;
 import com.devikapps.vaikaparts.model.PapiPayment;
 import com.devikapps.vaikaparts.model.PapiPaymentRequest;
 import com.devikapps.vaikaparts.model.PapiPaymentResponse;
@@ -49,6 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PapiPaymentService {
   private final PapiConf conf;
+  private final PapiClient papiClient;
   private final PaymentGatewayFactory gatewayFactory;
   private final PapiPaymentRepository papiPaymentRepository;
   private final PaymentPartyRepository paymentPartyRepository;
@@ -81,6 +85,20 @@ public class PapiPaymentService {
     return papiPaymentMapper.toModel(updated);
   }
 
+  public PapiFeeQuote getFees(
+      com.devikapps.vaikaparts.model.classifier.PapiPaymentMethod paymentMethod,
+      BigDecimal amount) {
+    if (paymentMethod == null
+        || amount == null
+        || amount.compareTo(BigDecimal.valueOf(300)) < 0
+        || amount.stripTrailingZeros().scale() > 0) {
+      throw new PaymentValidationException("Papi amount must be an integer of at least 300 MGA.");
+    }
+    PapiFeeQuoteResponse.Data quote = papiClient.getFees(paymentMethod, amount);
+    return new PapiFeeQuote(
+        paymentMethod, quote.amount(), quote.payerFee(), quote.totalAmount(), quote.currency());
+  }
+
   public PapiPayment getPayment(String reference) {
     JPapiPayment payment =
         papiPaymentRepository
@@ -97,7 +115,8 @@ public class PapiPaymentService {
 
   @Transactional
   public void handleCallBack(byte[] rawBody, String signatureHeader) {
-    if (!signatureVerifier.isValid(rawBody, signatureHeader, conf.getWebhookSecret(), java.time.Instant.now())) {
+    if (!signatureVerifier.isValid(
+        rawBody, signatureHeader, conf.getWebhookSecret(), java.time.Instant.now())) {
       throw new PapiWebhookSecurityException("Papi callback signature is invalid or expired.");
     }
 
@@ -146,8 +165,7 @@ public class PapiPaymentService {
     papiPaymentRepository.save(payment);
   }
 
-  private void verifyUnpersistedCallbackToken(
-      JPapiPayment payment, PapiCallBackRequest callback) {
+  private void verifyUnpersistedCallbackToken(JPapiPayment payment, PapiCallBackRequest callback) {
     try {
       PapiPaymentResponse providerPayment =
           (PapiPaymentResponse)
@@ -168,8 +186,7 @@ public class PapiPaymentService {
     }
   }
 
-  private JPapiPayment resolveExistingPayment(
-      JPapiPayment existing, RPapiPaymentRequest request) {
+  private JPapiPayment resolveExistingPayment(JPapiPayment existing, RPapiPaymentRequest request) {
     if (existing.getStatus() == PENDING || existing.getStatus() == SUCCESS) {
       boolean samePayment =
           existing.getAmount().compareTo(request.getAmount()) == 0
@@ -189,6 +206,8 @@ public class PapiPaymentService {
     existing.setStatus(PENDING);
     existing.setNotificationToken(null);
     existing.setPapiPaymentReference(null);
+    existing.setPayerFee(null);
+    existing.setTotalAmount(null);
     existing.setAmount(request.getAmount());
     existing.setPaymentMethod(request.getPaymentMethod().name());
     existing.setPayer(resolvePaymentParty(toStoredParty(request.getPayer())));
@@ -264,7 +283,8 @@ public class PapiPaymentService {
     if (request.getPayer().getName().length() > 255
         || request.getDescription() == null
         || request.getDescription().length() > 255) {
-      throw new PaymentValidationException("Papi name and description must not exceed 255 characters.");
+      throw new PaymentValidationException(
+          "Papi name and description must not exceed 255 characters.");
     }
     normalizeMadagascarPhoneNumber(request.getPayer().getPhoneNumber());
     if (request.getPaymentMethod() == null) {
@@ -285,8 +305,7 @@ public class PapiPaymentService {
   private void refreshPendingPayment(String reference) {
     try {
       PapiPaymentResponse response =
-          (PapiPaymentResponse)
-              gatewayFactory.getGateway(PAPI).getPaymentStatus(reference);
+          (PapiPaymentResponse) gatewayFactory.getGateway(PAPI).getPaymentStatus(reference);
       if (!reference.equals(response.getTransactionId())) return;
       JPapiPayment payment =
           papiPaymentRepository
@@ -338,7 +357,8 @@ public class PapiPaymentService {
   }
 
   private PaymentStatus resolveCallbackStatus(String status) {
-    if (status == null) throw new PaymentValidationException("Papi callback paymentStatus is missing.");
+    if (status == null)
+      throw new PaymentValidationException("Papi callback paymentStatus is missing.");
     return switch (status) {
       case "PENDING" -> PaymentStatus.PENDING;
       case "SUCCESS" -> PaymentStatus.COMPLETED;

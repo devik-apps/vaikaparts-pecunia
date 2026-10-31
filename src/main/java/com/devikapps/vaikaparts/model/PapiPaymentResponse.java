@@ -1,6 +1,7 @@
 package com.devikapps.vaikaparts.model;
 
 import com.devikapps.vaikaparts.model.classifier.PapiPaymentMethod;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,4 +19,6 @@ public class PapiPaymentResponse extends PaymentResponse {
   private String papiPaymentReference;
   private PapiPaymentMethod paymentMethod;
   private String notificationToken;
+  private BigDecimal payerFee;
+  private BigDecimal totalAmount;
 }

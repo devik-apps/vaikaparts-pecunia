@@ -8,11 +8,6 @@ import org.springframework.web.client.RestTemplate;
 public class RestTemplateConf {
 
   @Bean
-  public RestTemplate mvolaRestTemplate() {
-    return new RestTemplate();
-  }
-
-  @Bean
   public RestTemplate papiRestTemplate() {
     return new RestTemplate();
   }

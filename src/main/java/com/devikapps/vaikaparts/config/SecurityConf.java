@@ -34,7 +34,6 @@ public class SecurityConf {
   private static final String ANY_SUBPATH = "/**";
   private static final String V_3_API_DOCS = "/v3/api-docs/**";
   private static final String V_3_API_DOCS_YAML = "/v3/api-docs.yaml";
-  private static final String MVOLA_CALLBACK_ENDPOINT = "/v1/payments/mvola/callback";
   private static final String PAPI_CALLBACK_ENDPOINT = "/v1/payments/papi/callback";
 
   private final ApiKeyFilter apiKeyFilter;
@@ -53,7 +52,6 @@ public class SecurityConf {
                     SWAGGER_UI_ENDPOINT,
                     V_3_API_DOCS,
                     V_3_API_DOCS_YAML,
-                    MVOLA_CALLBACK_ENDPOINT,
                     PAPI_CALLBACK_ENDPOINT))
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
@@ -74,7 +72,6 @@ public class SecurityConf {
                         SWAGGER_UI_ENDPOINT,
                         V_3_API_DOCS,
                         V_3_API_DOCS_YAML,
-                        MVOLA_CALLBACK_ENDPOINT,
                         PAPI_CALLBACK_ENDPOINT)
                     .permitAll()
                     .anyRequest()

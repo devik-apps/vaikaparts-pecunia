@@ -7,16 +7,16 @@ COPY gradlew ./
 
 RUN --mount=type=secret,id=github_actor \
     --mount=type=secret,id=github_token \
-    GITHUB_ACTOR=$(cat /run/secrets/github_actor) \
-    GITHUB_TOKEN=$(cat /run/secrets/github_token) \
+    GITHUB_ACTOR="" \
+    GITHUB_TOKEN="" \
     ./gradlew dependencies --no-daemon || true
 COPY doc ./doc
 COPY src ./src
 
 RUN --mount=type=secret,id=github_actor \
     --mount=type=secret,id=github_token \
-    GITHUB_ACTOR=$(cat /run/secrets/github_actor) \
-    GITHUB_TOKEN=$(cat /run/secrets/github_token) \
+    GITHUB_ACTOR="" \
+    GITHUB_TOKEN="" \
     ./gradlew bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine

@@ -3,6 +3,7 @@ package com.devikapps.vaikaparts.repository.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -30,4 +31,10 @@ public class JPapiPayment extends JPayment {
 
   @Column(name = "notification_token")
   private String notificationToken;
+
+  @Column(name = "payer_fee")
+  private BigDecimal payerFee;
+
+  @Column(name = "total_amount")
+  private BigDecimal totalAmount;
 }

@@ -3,9 +3,11 @@ package com.devikapps.vaikaparts.endpoint.rest.controller;
 import static org.owasp.encoder.Encode.forJava;
 
 import com.devikapps.vaikaparts.endpoint.rest.controller.model.RPapiPaymentRequest;
-import com.devikapps.vaikaparts.exception.PaymentValidationException;
 import com.devikapps.vaikaparts.exception.PapiWebhookSecurityException;
+import com.devikapps.vaikaparts.exception.PaymentValidationException;
+import com.devikapps.vaikaparts.model.PapiFeeQuote;
 import com.devikapps.vaikaparts.model.PapiPayment;
+import com.devikapps.vaikaparts.model.classifier.PapiPaymentMethod;
 import com.devikapps.vaikaparts.service.PapiPaymentService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -43,6 +46,12 @@ public class PapiController {
   public PapiPayment getPayment(@PathVariable @NotBlank String reference) {
     log.info("Papi payment lookup for reference={}", forJava(reference));
     return papiPaymentService.getPayment(reference);
+  }
+
+  @GetMapping("/fees")
+  public PapiFeeQuote getFees(
+      @RequestParam PapiPaymentMethod paymentMethod, @RequestParam java.math.BigDecimal amount) {
+    return papiPaymentService.getFees(paymentMethod, amount);
   }
 
   @PostMapping("/callback")

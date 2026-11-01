@@ -2,13 +2,16 @@ package com.devikapps.vaikaparts.client.papi;
 
 import static java.lang.String.format;
 
+import com.devikapps.vaikaparts.client.papi.model.PapiFeeQuoteResponse;
 import com.devikapps.vaikaparts.client.papi.model.PapiInitiatePaymentRequest;
 import com.devikapps.vaikaparts.client.papi.model.PapiPaymentResponse;
 import com.devikapps.vaikaparts.config.PapiConf;
 import com.devikapps.vaikaparts.exception.PaymentConflictException;
 import com.devikapps.vaikaparts.exception.PaymentGatewayException;
+import com.devikapps.vaikaparts.model.classifier.PapiPaymentMethod;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
 @Component
@@ -48,8 +52,48 @@ public class PapiClient {
     return exchange(HttpMethod.GET, PAYMENTS_PATH + "/" + encodedReference, null);
   }
 
+  public PapiFeeQuoteResponse.Data getFees(PapiPaymentMethod paymentMethod, BigDecimal amount) {
+    if (paymentMethod == null
+        || amount == null
+        || amount.compareTo(BigDecimal.valueOf(300)) < 0
+        || amount.stripTrailingZeros().scale() > 0) {
+      throw new PaymentGatewayException("Papi fee quote request is invalid.");
+    }
+
+    URI uri =
+        UriComponentsBuilder.fromUriString(trimTrailingSlash(conf.getBaseUrl()) + PAYMENTS_PATH)
+            .path("/fees")
+            .queryParam("paymentMethod", paymentMethod.name())
+            .queryParam("amount", amount.toBigIntegerExact())
+            .build()
+            .encode()
+            .toUri();
+    PapiFeeQuoteResponse response = exchange(HttpMethod.GET, uri, null, PapiFeeQuoteResponse.class);
+    PapiFeeQuoteResponse.Data quote = response.data();
+    if (quote == null
+        || !paymentMethod.name().equals(quote.paymentMethod())
+        || quote.amount() == null
+        || quote.amount().compareTo(amount) != 0
+        || !isInteger(quote.payerFee())
+        || quote.payerFee().signum() < 0
+        || !isInteger(quote.totalAmount())
+        || quote.totalAmount().compareTo(amount.add(quote.payerFee())) != 0
+        || !"MGA".equals(quote.currency())) {
+      throw new PaymentGatewayException("Papi returned an invalid fee quote.");
+    }
+    return quote;
+  }
+
   private PapiPaymentResponse exchange(
       HttpMethod method, String path, PapiInitiatePaymentRequest body) {
+    return exchange(
+        method,
+        URI.create(trimTrailingSlash(conf.getBaseUrl()) + path),
+        body,
+        PapiPaymentResponse.class);
+  }
+
+  private <T> T exchange(HttpMethod method, URI uri, Object body, Class<T> responseType) {
     if (conf.getApiKey() == null || conf.getApiKey().isBlank()) {
       throw new PaymentGatewayException("Papi API key is not configured.");
     }
@@ -61,17 +105,15 @@ public class PapiClient {
 
     try {
       var response =
-          restTemplate.exchange(
-              URI.create(trimTrailingSlash(conf.getBaseUrl()) + path),
-              method,
-              new HttpEntity<>(body, headers),
-              PapiPaymentResponse.class);
+          restTemplate.exchange(uri, method, new HttpEntity<>(body, headers), responseType);
       if (response.getBody() == null) {
         throw new PaymentGatewayException("Papi returned an empty response.");
       }
       return response.getBody();
     } catch (HttpStatusCodeException e) {
-      if (e.getStatusCode().value() == 409 && isPaymentConflict(e.getResponseBodyAsByteArray())) {
+      if (responseType == PapiPaymentResponse.class
+          && e.getStatusCode().value() == 409
+          && isPaymentConflict(e.getResponseBodyAsByteArray())) {
         throw new PaymentConflictException(
             format("Papi rejected the payment reference with HTTP %d.", e.getStatusCode().value()));
       }
@@ -82,9 +124,14 @@ public class PapiClient {
     }
   }
 
+  private boolean isInteger(BigDecimal value) {
+    return value != null && value.stripTrailingZeros().scale() <= 0;
+  }
+
   private boolean isPaymentConflict(byte[] responseBody) {
     try {
-      PapiPaymentResponse response = objectMapper.readValue(responseBody, PapiPaymentResponse.class);
+      PapiPaymentResponse response =
+          objectMapper.readValue(responseBody, PapiPaymentResponse.class);
       return response.error() != null && "PAYMENT_CONFLICT".equals(response.error().code());
     } catch (IOException e) {
       return false;

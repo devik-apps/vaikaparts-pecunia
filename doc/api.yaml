@@ -382,6 +382,7 @@ paths:
       summary: Initiate a payment through Papi
       description: >
         Initiates a Papi payment using MVOLA, AIRTEL_MONEY, or ORANGE_MONEY. Amounts are integer MGA values of at least 300. For Orange Money, temporaryCode is required. The caller must supply the same reference and payment details when retrying a network error.
+
       operationId: initiatePapiPayment
       security:
         - ApiKeyAuth: []
@@ -408,6 +409,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServer'
+  /v1/payments/papi/fees:
+    get:
+      tags:
+        - Papi
+      summary: Quote payer fees for a Papi payment
+      description: Returns the exact Papi payer fee and total for the selected enabled payment method. Fees are merchant-configured; use totalAmount as the amount displayed to the payer. The requested amount excludes payer fees.
+      operationId: getPapiPaymentFees
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: paymentMethod
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/PapiPaymentMethod'
+        - name: amount
+          in: query
+          required: true
+          description: Integer base amount in MGA, excluding payer fees.
+          schema:
+            type: integer
+            minimum: 300
+            example: 3000
+      responses:
+        '200':
+          description: Fee quote returned by Papi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PapiFeeQuote'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalServer'
   /v1/payments/papi/{reference}:
@@ -700,6 +737,16 @@ components:
         notificationToken:
           type: string
           nullable: true
+        payerFee:
+          type: number
+          format: decimal
+          nullable: true
+          description: Exact payer fee returned by Papi. Null for historical records without fee data.
+        totalAmount:
+          type: number
+          format: decimal
+          nullable: true
+          description: Total charged amount returned by Papi. Use for display when present.
         description:
           type: string
         payer:
@@ -723,6 +770,27 @@ components:
           $ref: '#/components/schemas/DateTime'
         updatedAt:
           $ref: '#/components/schemas/DateTime'
+    PapiFeeQuote:
+      type: object
+      required: [paymentMethod, amount, payerFee, totalAmount, currency]
+      properties:
+        paymentMethod:
+          $ref: '#/components/schemas/PapiPaymentMethod'
+        amount:
+          type: number
+          format: decimal
+          description: Base payment amount, excluding payer fees.
+        payerFee:
+          type: number
+          format: decimal
+          description: Exact fee configured on the Papi merchant shop; may be zero.
+        totalAmount:
+          type: number
+          format: decimal
+          description: Exact total charged, equal to amount plus payerFee.
+        currency:
+          type: string
+          enum: [MGA]
     PapiPaymentMethod:
       type: string
       enum: [MVOLA, AIRTEL_MONEY, ORANGE_MONEY]

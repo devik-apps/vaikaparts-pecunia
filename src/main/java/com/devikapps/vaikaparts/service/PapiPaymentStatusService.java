@@ -42,6 +42,20 @@ public class PapiPaymentStatusService {
           "Papi response does not match the locally stored payment details.");
     }
 
+    if (response.getPayerFee() != null || response.getTotalAmount() != null) {
+      if (response.getPayerFee() == null
+          || response.getTotalAmount() == null
+          || response.getPayerFee().signum() < 0
+          || response.getPayerFee().stripTrailingZeros().scale() > 0
+          || response.getTotalAmount().stripTrailingZeros().scale() > 0
+          || response.getTotalAmount().compareTo(payment.getAmount().add(response.getPayerFee()))
+              != 0) {
+        throw new PaymentGatewayException("Papi response contains invalid fee totals.");
+      }
+      payment.setPayerFee(response.getPayerFee());
+      payment.setTotalAmount(response.getTotalAmount());
+    }
+
     if (response.getPapiPaymentReference() != null) {
       payment.setPapiPaymentReference(response.getPapiPaymentReference());
     }

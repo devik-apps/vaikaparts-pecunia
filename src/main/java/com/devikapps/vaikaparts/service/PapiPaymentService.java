@@ -34,9 +34,9 @@ import com.devikapps.vaikaparts.repository.PaymentPartyRepository;
 import com.devikapps.vaikaparts.repository.model.JPapiPayment;
 import com.devikapps.vaikaparts.repository.model.JPaymentParty;
 import com.devikapps.vaikaparts.service.papi.PapiSignatureVerifier;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -123,7 +123,7 @@ public class PapiPaymentService {
     final PapiCallBackRequest callback;
     try {
       callback = objectMapper.readValue(rawBody, PapiCallBackRequest.class);
-    } catch (JsonProcessingException e) {
+    } catch (IOException e) {
       throw new PaymentValidationException("Papi callback body is not valid JSON.");
     }
     if (callback == null

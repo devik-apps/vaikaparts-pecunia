@@ -312,6 +312,12 @@ public class PapiPaymentService {
 
   private JPapiPayment createPayment(RPapiPaymentRequest request) {
     LocalDateTime createdAt = now();
+    String paymentId = randomUUID().toString();
+    String reference = forJava(request.getReference());
+    log.info(
+        "Creating local Papi payment record: merchantReference={}, paymentId={}",
+        reference,
+        forJava(paymentId));
     PaymentParty payee =
         PaymentParty.builder()
             .phoneNumber(conf.getPartnerMsisdn())
@@ -319,23 +325,32 @@ public class PapiPaymentService {
             .country(MADAGASCAR)
             .build();
 
-    return papiPaymentRepository.save(
-        JPapiPayment.builder()
-            .id(randomUUID().toString())
-            .transactionId(request.getReference())
-            .merchantReference(request.getReference())
-            .paymentMethod(request.getPaymentMethod().name())
-            .payer(resolvePaymentParty(toStoredParty(request.getPayer())))
-            .payee(resolvePaymentParty(toStoredParty(payee)))
-            .amount(request.getAmount())
-            .description(request.getDescription())
-            .provider(PAPI)
-            .currency(MGA)
-            .status(PENDING)
-            .type(request.getType())
-            .createdAt(createdAt)
-            .updatedAt(createdAt)
-            .build());
+    JPapiPayment payment =
+        papiPaymentRepository.save(
+            JPapiPayment.builder()
+                .id(paymentId)
+                .transactionId(request.getReference())
+                .merchantReference(request.getReference())
+                .paymentMethod(request.getPaymentMethod().name())
+                .payer(resolvePaymentParty(toStoredParty(request.getPayer())))
+                .payee(resolvePaymentParty(toStoredParty(payee)))
+                .amount(request.getAmount())
+                .description(request.getDescription())
+                .provider(PAPI)
+                .currency(MGA)
+                .status(PENDING)
+                .type(request.getType())
+                .createdAt(createdAt)
+                .updatedAt(createdAt)
+                .build());
+    log.info(
+        "Local Papi payment record saved: merchantReference={}, transactionId={}, paymentId={},"
+            + " status={}",
+        forJava(payment.getMerchantReference()),
+        forJava(payment.getTransactionId()),
+        forJava(payment.getId()),
+        payment.getStatus());
+    return payment;
   }
 
   private PapiPaymentRequest toGatewayRequest(RPapiPaymentRequest request, JPapiPayment payment) {

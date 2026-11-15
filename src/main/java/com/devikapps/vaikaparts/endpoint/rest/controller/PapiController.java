@@ -38,8 +38,17 @@ public class PapiController {
   @PostMapping
   public ResponseEntity<PapiPayment> initiatePayment(
       @Valid @NotNull @RequestBody RPapiPaymentRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(papiPaymentService.initiatePayment(request));
+    log.info(
+        "Papi initiation request received: reference={}, method={}, amount={}",
+        forJava(request.getReference()),
+        request.getPaymentMethod(),
+        request.getAmount());
+    PapiPayment payment = papiPaymentService.initiatePayment(request);
+    log.info(
+        "Papi initiation response returned: reference={}, status={}",
+        forJava(payment.getMerchantReference()),
+        payment.getStatus());
+    return ResponseEntity.status(HttpStatus.CREATED).body(payment);
   }
 
   @GetMapping("/{reference}")
@@ -58,6 +67,7 @@ public class PapiController {
   public ResponseEntity<Void> handleCallback(
       @RequestBody byte[] rawBody,
       @RequestHeader(value = "X-Papi-Signature", required = false) String signatureHeader) {
+    log.info("Papi callback request received: bodyBytes={}", rawBody.length);
     papiPaymentService.handleCallBack(rawBody, signatureHeader);
     return ResponseEntity.ok().build();
   }

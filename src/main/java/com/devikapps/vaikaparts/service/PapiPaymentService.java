@@ -46,6 +46,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -63,25 +65,74 @@ public class PapiPaymentService {
   private final ObjectMapper objectMapper;
 
   public PapiPayment initiatePayment(RPapiPaymentRequest request) {
+    String reference = forJava(request.getReference());
+    log.info(
+        "Papi payment initiation started: reference={}, method={}, amount={}",
+        reference,
+        request.getPaymentMethod(),
+        request.getAmount());
     validateRequest(request);
+    log.info("Papi payment request validated: reference={}", reference);
 
     JPapiPayment payment;
     var existing = papiPaymentRepository.findByMerchantReference(request.getReference());
     if (existing.isPresent()) {
+      log.info(
+          "Existing Papi payment found: reference={}, status={}",
+          reference,
+          existing.get().getStatus());
       boolean paymentAlreadyActive =
           existing.get().getStatus() == PENDING || existing.get().getStatus() == SUCCESS;
       payment = resolveExistingPayment(existing.get(), request);
-      if (paymentAlreadyActive) return papiPaymentMapper.toModel(payment);
+      if (paymentAlreadyActive) {
+        log.info(
+            "Returning existing Papi payment without a new provider call: reference={}, status={}",
+            reference,
+            payment.getStatus());
+        return papiPaymentMapper.toModel(payment);
+      }
     } else {
-      payment = createPayment(request);
+      log.info("No local Papi payment found; saving a new payment: reference={}", reference);
+      try {
+        payment = createPayment(request);
+      } catch (RuntimeException e) {
+        log.error(
+            "Failed to save Papi payment in the local database: reference={}, errorType={}",
+            reference,
+            e.getClass().getSimpleName());
+        throw e;
+      }
     }
 
-    PapiPaymentResponse response =
-        (PapiPaymentResponse)
-            gatewayFactory.getGateway(PAPI).initiatePayment(toGatewayRequest(request, payment));
+    log.info(
+        "Papi payment stored locally; calling provider: reference={}, paymentId={}, status={}",
+        reference,
+        forJava(payment.getId()),
+        payment.getStatus());
+    PapiPaymentResponse response;
+    try {
+      response =
+          (PapiPaymentResponse)
+              gatewayFactory.getGateway(PAPI).initiatePayment(toGatewayRequest(request, payment));
+    } catch (RuntimeException e) {
+      log.error(
+          "Papi provider initiation failed: reference={}, errorType={}",
+          reference,
+          e.getClass().getSimpleName());
+      throw e;
+    }
+    log.info(
+        "Papi provider response received: reference={}, providerReference={}, status={}",
+        reference,
+        forJava(response.getPapiPaymentReference()),
+        response.getStatus());
 
     JPapiPayment updated =
         papiPaymentStatusService.applyProviderResponse(request.getReference(), response);
+    log.info(
+        "Papi provider status saved locally: reference={}, status={}",
+        reference,
+        updated.getStatus());
     return papiPaymentMapper.toModel(updated);
   }
 
@@ -100,13 +151,13 @@ public class PapiPaymentService {
   }
 
   public PapiPayment getPayment(String reference) {
-    JPapiPayment payment =
-        papiPaymentRepository
-            .findByMerchantReference(reference)
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException(
-                        format("No Papi payment for reference=%s", forJava(reference))));
+    var localPayment = papiPaymentRepository.findByMerchantReference(reference);
+    if (localPayment.isEmpty()) {
+      log.warn("No local Papi payment found for status lookup: reference={}", forJava(reference));
+      throw new EntityNotFoundException(
+          format("No Papi payment for reference=%s", forJava(reference)));
+    }
+    JPapiPayment payment = localPayment.orElseThrow();
 
     if (payment.getStatus() == PENDING) refreshPendingPayment(reference);
     return papiPaymentMapper.toModel(
@@ -117,8 +168,10 @@ public class PapiPaymentService {
   public void handleCallBack(byte[] rawBody, String signatureHeader) {
     if (!signatureVerifier.isValid(
         rawBody, signatureHeader, conf.getWebhookSecret(), java.time.Instant.now())) {
+      log.warn("Papi callback signature rejected: bodyBytes={}", rawBody.length);
       throw new PapiWebhookSecurityException("Papi callback signature is invalid or expired.");
     }
+    log.info("Papi callback signature verified: bodyBytes={}", rawBody.length);
 
     final PapiCallBackRequest callback;
     try {
@@ -133,18 +186,30 @@ public class PapiPaymentService {
         || callback.notificationToken().isBlank()) {
       throw new PaymentValidationException("Papi callback is missing payment identifiers.");
     }
+    String reference = forJava(callback.merchantPaymentReference());
+    log.info(
+        "Papi callback parsed: reference={}, providerReference={}, providerStatus={}",
+        reference,
+        forJava(callback.paymentReference()),
+        callback.paymentStatus());
 
-    JPapiPayment payment =
-        papiPaymentRepository
-            .findByMerchantReferenceForUpdate(callback.merchantPaymentReference())
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException(
-                        format(
-                            "No Papi payment for reference=%s",
-                            forJava(callback.merchantPaymentReference()))));
+    var localPayment =
+        papiPaymentRepository.findByMerchantReferenceForUpdate(callback.merchantPaymentReference());
+    if (localPayment.isEmpty()) {
+      log.warn("No local Papi payment found for callback: reference={}", reference);
+      throw new EntityNotFoundException(format("No Papi payment for reference=%s", reference));
+    }
+    JPapiPayment payment = localPayment.orElseThrow();
+    log.info(
+        "Papi callback matched local payment: reference={}, currentStatus={}",
+        reference,
+        payment.getStatus());
 
     if (payment.getNotificationToken() == null) {
+      log.info(
+          "Papi callback has no stored notification token; verifying against provider:"
+              + " reference={}",
+          reference);
       verifyUnpersistedCallbackToken(payment, callback);
     } else if (!constantTimeEquals(payment.getNotificationToken(), callback.notificationToken())) {
       throw new PapiWebhookSecurityException("Papi callback token does not match the payment.");
@@ -153,9 +218,17 @@ public class PapiPaymentService {
         && !constantTimeEquals(payment.getPapiPaymentReference(), callback.paymentReference())) {
       throw new PapiWebhookSecurityException("Papi callback payment reference does not match.");
     }
+    log.info("Papi callback payment identifiers validated: reference={}", reference);
 
-    if (payment.getStatus() != PENDING) return;
+    if (payment.getStatus() != PENDING) {
+      log.info(
+          "Papi callback ignored because payment is already terminal: reference={}, status={}",
+          reference,
+          payment.getStatus());
+      return;
+    }
 
+    var previousStatus = payment.getStatus();
     PaymentStatus status = resolveCallbackStatus(callback.paymentStatus());
     payment.setStatus(toVerificationStatus(status));
     if (callback.paymentReference() != null) {
@@ -163,6 +236,26 @@ public class PapiPaymentService {
     }
     payment.setUpdatedAt(now());
     papiPaymentRepository.save(payment);
+    var updatedStatus = payment.getStatus();
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              log.info(
+                  "Papi callback payment status committed: reference={}, status={} -> {}",
+                  reference,
+                  previousStatus,
+                  updatedStatus);
+            }
+          });
+    } else {
+      log.info(
+          "Papi callback payment status saved: reference={}, status={} -> {}",
+          reference,
+          previousStatus,
+          updatedStatus);
+    }
   }
 
   private void verifyUnpersistedCallbackToken(JPapiPayment payment, PapiCallBackRequest callback) {

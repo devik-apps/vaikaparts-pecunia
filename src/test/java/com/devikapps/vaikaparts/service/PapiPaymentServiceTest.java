@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -127,7 +128,8 @@ class PapiPaymentServiceTest {
 
     when(conf.getPartnerName()).thenReturn("Merchant");
     when(conf.getPartnerMsisdn()).thenReturn("0345554321");
-    when(papiPaymentRepository.findByMerchantReference(reference)).thenReturn(Optional.empty());
+    when(papiPaymentRepository.findWithPartiesByMerchantReference(reference))
+        .thenAnswer(invocation -> Optional.ofNullable(savedPayment.get()));
     when(paymentPartyRepository.findJPaymentPartyByPhoneNumber(payerPhone))
         .thenReturn(Optional.of(payerParty));
     when(paymentPartyRepository.findJPaymentPartyByPhoneNumber("0345554321"))
@@ -158,6 +160,8 @@ class PapiPaymentServiceTest {
     var request = ArgumentCaptor.forClass(PaymentRequest.class);
     org.mockito.Mockito.verify(gateway).initiatePayment(request.capture());
     assertThat(request.getValue().getPayer().getPhoneNumber()).isEqualTo(payerPhone);
+    verify(papiPaymentRepository, times(3)).findWithPartiesByMerchantReference(reference);
+    verify(paymentPartyMapper).toModel(payeeParty);
   }
 
   @Test

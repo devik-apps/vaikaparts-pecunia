@@ -161,7 +161,12 @@ public class PapiPaymentService {
 
     if (payment.getStatus() == PENDING) refreshPendingPayment(reference);
     return papiPaymentMapper.toModel(
-        papiPaymentRepository.findByMerchantReference(reference).orElse(payment));
+        papiPaymentRepository
+            .findWithPartiesByMerchantReference(reference)
+            .orElseThrow(
+                () ->
+                    new EntityNotFoundException(
+                        format("No Papi payment for reference=%s", forJava(reference)))));
   }
 
   @Transactional

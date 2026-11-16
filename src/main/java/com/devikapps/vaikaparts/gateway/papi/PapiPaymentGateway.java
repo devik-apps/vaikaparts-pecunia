@@ -47,6 +47,20 @@ public class PapiPaymentGateway extends AbstractPaymentGateway {
     PapiPaymentRequest request = requirePapiRequest(paymentRequest);
     validatePapiFields(request);
 
+    String phoneNumber = request.getPayer().getPhoneNumber();
+    String temporaryCode = request.getTemporaryCode();
+    if (conf.isTestMode()) {
+      phoneNumber =
+          switch (request.getPaymentMethod()) {
+            case MVOLA -> "0341230001";
+            case AIRTEL_MONEY -> "331230001";
+            case ORANGE_MONEY -> "0321230001";
+          };
+      if (request.getPaymentMethod() == PapiPaymentMethod.ORANGE_MONEY) {
+        temporaryCode = "101001";
+      }
+    }
+
     PapiInitiatePaymentRequest apiRequest =
         new PapiInitiatePaymentRequest(
             request.getPaymentMethod().name(),
@@ -57,10 +71,8 @@ public class PapiPaymentGateway extends AbstractPaymentGateway {
             blankToNull(conf.getNotificationUrl()),
             request.getPayer().getName(),
             request.getPayerEmail(),
-            request.getPayer().getPhoneNumber(),
-            request.getPaymentMethod() == PapiPaymentMethod.ORANGE_MONEY
-                ? request.getTemporaryCode()
-                : null,
+            phoneNumber,
+            request.getPaymentMethod() == PapiPaymentMethod.ORANGE_MONEY ? temporaryCode : null,
             conf.isTestMode());
 
     log.info(

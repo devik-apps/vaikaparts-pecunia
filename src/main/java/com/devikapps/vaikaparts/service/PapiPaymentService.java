@@ -75,7 +75,7 @@ public class PapiPaymentService {
     log.info("Papi payment request validated: reference={}", reference);
 
     JPapiPayment payment;
-    var existing = papiPaymentRepository.findByMerchantReference(request.getReference());
+    var existing = papiPaymentRepository.findWithPartiesByMerchantReference(request.getReference());
     if (existing.isPresent()) {
       log.info(
           "Existing Papi payment found: reference={}, status={}",
@@ -109,11 +109,14 @@ public class PapiPaymentService {
         reference,
         forJava(payment.getId()),
         payment.getStatus());
+    JPapiPayment paymentWithParties = loadPaymentWithParties(reference);
     PapiPaymentResponse response;
     try {
       response =
           (PapiPaymentResponse)
-              gatewayFactory.getGateway(PAPI).initiatePayment(toGatewayRequest(request, payment));
+              gatewayFactory
+                  .getGateway(PAPI)
+                  .initiatePayment(toGatewayRequest(request, paymentWithParties));
     } catch (RuntimeException e) {
       log.error(
           "Papi provider initiation failed: reference={}, errorType={}",
@@ -133,7 +136,7 @@ public class PapiPaymentService {
         "Papi provider status saved locally: reference={}, status={}",
         reference,
         updated.getStatus());
-    return papiPaymentMapper.toModel(updated);
+    return papiPaymentMapper.toModel(loadPaymentWithParties(reference));
   }
 
   public PapiFeeQuote getFees(
@@ -160,13 +163,16 @@ public class PapiPaymentService {
     JPapiPayment payment = localPayment.orElseThrow();
 
     if (payment.getStatus() == PENDING) refreshPendingPayment(reference);
-    return papiPaymentMapper.toModel(
-        papiPaymentRepository
-            .findWithPartiesByMerchantReference(reference)
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException(
-                        format("No Papi payment for reference=%s", forJava(reference)))));
+    return papiPaymentMapper.toModel(loadPaymentWithParties(reference));
+  }
+
+  private JPapiPayment loadPaymentWithParties(String reference) {
+    return papiPaymentRepository
+        .findWithPartiesByMerchantReference(reference)
+        .orElseThrow(
+            () ->
+                new EntityNotFoundException(
+                    format("No Papi payment for reference=%s", forJava(reference))));
   }
 
   @Transactional
